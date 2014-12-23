@@ -1,0 +1,3 @@
+[submodule "yaml.swift"]
+	path = yaml.swift
+	url = https://github.com/behrang/yaml.swift
