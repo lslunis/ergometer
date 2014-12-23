@@ -7,20 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		A31983C71A48FB90008ADDC0 /* .gitignore in Resources */ = {isa = PBXBuildFile; fileRef = A31983B81A48FB90008ADDC0 /* .gitignore */; };
-		A31983C81A48FB90008ADDC0 /* libyaml.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = A31983BA1A48FB90008ADDC0 /* libyaml.dylib */; };
-		A31983C91A48FB90008ADDC0 /* test in Resources */ = {isa = PBXBuildFile; fileRef = A31983BB1A48FB90008ADDC0 /* test */; };
-		A31983CA1A48FB90008ADDC0 /* Yaml.swiftdoc in Resources */ = {isa = PBXBuildFile; fileRef = A31983BC1A48FB90008ADDC0 /* Yaml.swiftdoc */; };
-		A31983CB1A48FB90008ADDC0 /* Yaml.swiftmodule in Resources */ = {isa = PBXBuildFile; fileRef = A31983BD1A48FB90008ADDC0 /* Yaml.swiftmodule */; };
-		A31983CC1A48FB90008ADDC0 /* Makefile in Sources */ = {isa = PBXBuildFile; fileRef = A31983BE1A48FB90008ADDC0 /* Makefile */; };
-		A31983CD1A48FB90008ADDC0 /* Operators.swift in Sources */ = {isa = PBXBuildFile; fileRef = A31983BF1A48FB90008ADDC0 /* Operators.swift */; };
-		A31983CE1A48FB90008ADDC0 /* Parser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A31983C01A48FB90008ADDC0 /* Parser.swift */; };
-		A31983CF1A48FB90008ADDC0 /* Readme.md in Sources */ = {isa = PBXBuildFile; fileRef = A31983C11A48FB90008ADDC0 /* Readme.md */; };
-		A31983D01A48FB90008ADDC0 /* Regex.swift in Sources */ = {isa = PBXBuildFile; fileRef = A31983C21A48FB90008ADDC0 /* Regex.swift */; };
-		A31983D11A48FB90008ADDC0 /* Result.swift in Sources */ = {isa = PBXBuildFile; fileRef = A31983C31A48FB90008ADDC0 /* Result.swift */; };
-		A31983D21A48FB90008ADDC0 /* Test.swift in Sources */ = {isa = PBXBuildFile; fileRef = A31983C41A48FB90008ADDC0 /* Test.swift */; };
-		A31983D31A48FB90008ADDC0 /* Tokenizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A31983C51A48FB90008ADDC0 /* Tokenizer.swift */; };
-		A31983D41A48FB90008ADDC0 /* Yaml.swift in Sources */ = {isa = PBXBuildFile; fileRef = A31983C61A48FB90008ADDC0 /* Yaml.swift */; };
 		A366C08219F7DCCB0062825C /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A366C08119F7DCCB0062825C /* AppDelegate.swift */; };
 		A366C08419F7DCCB0062825C /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A366C08319F7DCCB0062825C /* Images.xcassets */; };
 		A366C08719F7DCCB0062825C /* MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = A366C08519F7DCCB0062825C /* MainMenu.xib */; };
@@ -38,20 +24,6 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		A31983B81A48FB90008ADDC0 /* .gitignore */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
-		A31983BA1A48FB90008ADDC0 /* libyaml.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; path = libyaml.dylib; sourceTree = "<group>"; };
-		A31983BB1A48FB90008ADDC0 /* test */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; path = test; sourceTree = "<group>"; };
-		A31983BC1A48FB90008ADDC0 /* Yaml.swiftdoc */ = {isa = PBXFileReference; lastKnownFileType = file; path = Yaml.swiftdoc; sourceTree = "<group>"; };
-		A31983BD1A48FB90008ADDC0 /* Yaml.swiftmodule */ = {isa = PBXFileReference; lastKnownFileType = file; path = Yaml.swiftmodule; sourceTree = "<group>"; };
-		A31983BE1A48FB90008ADDC0 /* Makefile */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.make; path = Makefile; sourceTree = "<group>"; };
-		A31983BF1A48FB90008ADDC0 /* Operators.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Operators.swift; sourceTree = "<group>"; };
-		A31983C01A48FB90008ADDC0 /* Parser.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Parser.swift; sourceTree = "<group>"; };
-		A31983C11A48FB90008ADDC0 /* Readme.md */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = net.daringfireball.markdown; path = Readme.md; sourceTree = "<group>"; };
-		A31983C21A48FB90008ADDC0 /* Regex.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Regex.swift; sourceTree = "<group>"; };
-		A31983C31A48FB90008ADDC0 /* Result.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Result.swift; sourceTree = "<group>"; };
-		A31983C41A48FB90008ADDC0 /* Test.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Test.swift; sourceTree = "<group>"; };
-		A31983C51A48FB90008ADDC0 /* Tokenizer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Tokenizer.swift; sourceTree = "<group>"; };
-		A31983C61A48FB90008ADDC0 /* Yaml.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Yaml.swift; sourceTree = "<group>"; };
 		A366C07C19F7DCCB0062825C /* Ergometer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Ergometer.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A366C08019F7DCCB0062825C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A366C08119F7DCCB0062825C /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -67,7 +39,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A31983C81A48FB90008ADDC0 /* libyaml.dylib in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -81,39 +52,9 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		A31983B71A48FB90008ADDC0 /* yaml.swift */ = {
-			isa = PBXGroup;
-			children = (
-				A31983B81A48FB90008ADDC0 /* .gitignore */,
-				A31983B91A48FB90008ADDC0 /* build */,
-				A31983BE1A48FB90008ADDC0 /* Makefile */,
-				A31983BF1A48FB90008ADDC0 /* Operators.swift */,
-				A31983C01A48FB90008ADDC0 /* Parser.swift */,
-				A31983C11A48FB90008ADDC0 /* Readme.md */,
-				A31983C21A48FB90008ADDC0 /* Regex.swift */,
-				A31983C31A48FB90008ADDC0 /* Result.swift */,
-				A31983C41A48FB90008ADDC0 /* Test.swift */,
-				A31983C51A48FB90008ADDC0 /* Tokenizer.swift */,
-				A31983C61A48FB90008ADDC0 /* Yaml.swift */,
-			);
-			path = yaml.swift;
-			sourceTree = "<group>";
-		};
-		A31983B91A48FB90008ADDC0 /* build */ = {
-			isa = PBXGroup;
-			children = (
-				A31983BA1A48FB90008ADDC0 /* libyaml.dylib */,
-				A31983BB1A48FB90008ADDC0 /* test */,
-				A31983BC1A48FB90008ADDC0 /* Yaml.swiftdoc */,
-				A31983BD1A48FB90008ADDC0 /* Yaml.swiftmodule */,
-			);
-			path = build;
-			sourceTree = "<group>";
-		};
 		A366C07319F7DCCB0062825C = {
 			isa = PBXGroup;
 			children = (
-				A31983B71A48FB90008ADDC0 /* yaml.swift */,
 				A366C07E19F7DCCB0062825C /* Ergometer */,
 				A366C08F19F7DCCB0062825C /* ErgometerTests */,
 				A366C07D19F7DCCB0062825C /* Products */,
@@ -245,11 +186,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A31983C91A48FB90008ADDC0 /* test in Resources */,
-				A31983CA1A48FB90008ADDC0 /* Yaml.swiftdoc in Resources */,
-				A31983CB1A48FB90008ADDC0 /* Yaml.swiftmodule in Resources */,
 				A366C08419F7DCCB0062825C /* Images.xcassets in Resources */,
-				A31983C71A48FB90008ADDC0 /* .gitignore in Resources */,
 				A366C08719F7DCCB0062825C /* MainMenu.xib in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -268,16 +205,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A31983CF1A48FB90008ADDC0 /* Readme.md in Sources */,
-				A31983CE1A48FB90008ADDC0 /* Parser.swift in Sources */,
-				A31983CC1A48FB90008ADDC0 /* Makefile in Sources */,
 				A366C08219F7DCCB0062825C /* AppDelegate.swift in Sources */,
-				A31983D11A48FB90008ADDC0 /* Result.swift in Sources */,
-				A31983D21A48FB90008ADDC0 /* Test.swift in Sources */,
-				A31983D41A48FB90008ADDC0 /* Yaml.swift in Sources */,
-				A31983CD1A48FB90008ADDC0 /* Operators.swift in Sources */,
-				A31983D31A48FB90008ADDC0 /* Tokenizer.swift in Sources */,
-				A31983D01A48FB90008ADDC0 /* Regex.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
