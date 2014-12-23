@@ -100,9 +100,10 @@ class Meter {
         return actionCost
     }
     
-    func reset() {
+    func expire() {
         if restTime == 0 {
             actionCost = 0
+            firstActed = nil
         }
     }
 }
@@ -206,8 +207,8 @@ class App {
         return (ticking, statusBuffer)
     }
     
-    func day() {
-        meters.map { $0.reset() }
+    func expire() {
+        meters.map { $0.expire() }
     }
 }
 
