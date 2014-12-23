@@ -1,0 +1,494 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 46;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A31983C71A48FB90008ADDC0 /* .gitignore in Resources */ = {isa = PBXBuildFile; fileRef = A31983B81A48FB90008ADDC0 /* .gitignore */; };
+		A31983C81A48FB90008ADDC0 /* libyaml.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = A31983BA1A48FB90008ADDC0 /* libyaml.dylib */; };
+		A31983C91A48FB90008ADDC0 /* test in Resources */ = {isa = PBXBuildFile; fileRef = A31983BB1A48FB90008ADDC0 /* test */; };
+		A31983CA1A48FB90008ADDC0 /* Yaml.swiftdoc in Resources */ = {isa = PBXBuildFile; fileRef = A31983BC1A48FB90008ADDC0 /* Yaml.swiftdoc */; };
+		A31983CB1A48FB90008ADDC0 /* Yaml.swiftmodule in Resources */ = {isa = PBXBuildFile; fileRef = A31983BD1A48FB90008ADDC0 /* Yaml.swiftmodule */; };
+		A31983CC1A48FB90008ADDC0 /* Makefile in Sources */ = {isa = PBXBuildFile; fileRef = A31983BE1A48FB90008ADDC0 /* Makefile */; };
+		A31983CD1A48FB90008ADDC0 /* Operators.swift in Sources */ = {isa = PBXBuildFile; fileRef = A31983BF1A48FB90008ADDC0 /* Operators.swift */; };
+		A31983CE1A48FB90008ADDC0 /* Parser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A31983C01A48FB90008ADDC0 /* Parser.swift */; };
+		A31983CF1A48FB90008ADDC0 /* Readme.md in Sources */ = {isa = PBXBuildFile; fileRef = A31983C11A48FB90008ADDC0 /* Readme.md */; };
+		A31983D01A48FB90008ADDC0 /* Regex.swift in Sources */ = {isa = PBXBuildFile; fileRef = A31983C21A48FB90008ADDC0 /* Regex.swift */; };
+		A31983D11A48FB90008ADDC0 /* Result.swift in Sources */ = {isa = PBXBuildFile; fileRef = A31983C31A48FB90008ADDC0 /* Result.swift */; };
+		A31983D21A48FB90008ADDC0 /* Test.swift in Sources */ = {isa = PBXBuildFile; fileRef = A31983C41A48FB90008ADDC0 /* Test.swift */; };
+		A31983D31A48FB90008ADDC0 /* Tokenizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A31983C51A48FB90008ADDC0 /* Tokenizer.swift */; };
+		A31983D41A48FB90008ADDC0 /* Yaml.swift in Sources */ = {isa = PBXBuildFile; fileRef = A31983C61A48FB90008ADDC0 /* Yaml.swift */; };
+		A366C08219F7DCCB0062825C /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A366C08119F7DCCB0062825C /* AppDelegate.swift */; };
+		A366C08419F7DCCB0062825C /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A366C08319F7DCCB0062825C /* Images.xcassets */; };
+		A366C08719F7DCCB0062825C /* MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = A366C08519F7DCCB0062825C /* MainMenu.xib */; };
+		A366C09319F7DCCB0062825C /* ErgometerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A366C09219F7DCCB0062825C /* ErgometerTests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		A366C08D19F7DCCB0062825C /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A366C07419F7DCCB0062825C /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A366C07B19F7DCCB0062825C;
+			remoteInfo = Ergometer;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		A31983B81A48FB90008ADDC0 /* .gitignore */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
+		A31983BA1A48FB90008ADDC0 /* libyaml.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; path = libyaml.dylib; sourceTree = "<group>"; };
+		A31983BB1A48FB90008ADDC0 /* test */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; path = test; sourceTree = "<group>"; };
+		A31983BC1A48FB90008ADDC0 /* Yaml.swiftdoc */ = {isa = PBXFileReference; lastKnownFileType = file; path = Yaml.swiftdoc; sourceTree = "<group>"; };
+		A31983BD1A48FB90008ADDC0 /* Yaml.swiftmodule */ = {isa = PBXFileReference; lastKnownFileType = file; path = Yaml.swiftmodule; sourceTree = "<group>"; };
+		A31983BE1A48FB90008ADDC0 /* Makefile */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.make; path = Makefile; sourceTree = "<group>"; };
+		A31983BF1A48FB90008ADDC0 /* Operators.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Operators.swift; sourceTree = "<group>"; };
+		A31983C01A48FB90008ADDC0 /* Parser.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Parser.swift; sourceTree = "<group>"; };
+		A31983C11A48FB90008ADDC0 /* Readme.md */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = net.daringfireball.markdown; path = Readme.md; sourceTree = "<group>"; };
+		A31983C21A48FB90008ADDC0 /* Regex.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Regex.swift; sourceTree = "<group>"; };
+		A31983C31A48FB90008ADDC0 /* Result.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Result.swift; sourceTree = "<group>"; };
+		A31983C41A48FB90008ADDC0 /* Test.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Test.swift; sourceTree = "<group>"; };
+		A31983C51A48FB90008ADDC0 /* Tokenizer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Tokenizer.swift; sourceTree = "<group>"; };
+		A31983C61A48FB90008ADDC0 /* Yaml.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Yaml.swift; sourceTree = "<group>"; };
+		A366C07C19F7DCCB0062825C /* Ergometer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Ergometer.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A366C08019F7DCCB0062825C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A366C08119F7DCCB0062825C /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		A366C08319F7DCCB0062825C /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Images.xcassets; sourceTree = "<group>"; };
+		A366C08619F7DCCB0062825C /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/MainMenu.xib; sourceTree = "<group>"; };
+		A366C08C19F7DCCB0062825C /* ErgometerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ErgometerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A366C09119F7DCCB0062825C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A366C09219F7DCCB0062825C /* ErgometerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErgometerTests.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A366C07919F7DCCB0062825C /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A31983C81A48FB90008ADDC0 /* libyaml.dylib in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A366C08919F7DCCB0062825C /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A31983B71A48FB90008ADDC0 /* yaml.swift */ = {
+			isa = PBXGroup;
+			children = (
+				A31983B81A48FB90008ADDC0 /* .gitignore */,
+				A31983B91A48FB90008ADDC0 /* build */,
+				A31983BE1A48FB90008ADDC0 /* Makefile */,
+				A31983BF1A48FB90008ADDC0 /* Operators.swift */,
+				A31983C01A48FB90008ADDC0 /* Parser.swift */,
+				A31983C11A48FB90008ADDC0 /* Readme.md */,
+				A31983C21A48FB90008ADDC0 /* Regex.swift */,
+				A31983C31A48FB90008ADDC0 /* Result.swift */,
+				A31983C41A48FB90008ADDC0 /* Test.swift */,
+				A31983C51A48FB90008ADDC0 /* Tokenizer.swift */,
+				A31983C61A48FB90008ADDC0 /* Yaml.swift */,
+			);
+			path = yaml.swift;
+			sourceTree = "<group>";
+		};
+		A31983B91A48FB90008ADDC0 /* build */ = {
+			isa = PBXGroup;
+			children = (
+				A31983BA1A48FB90008ADDC0 /* libyaml.dylib */,
+				A31983BB1A48FB90008ADDC0 /* test */,
+				A31983BC1A48FB90008ADDC0 /* Yaml.swiftdoc */,
+				A31983BD1A48FB90008ADDC0 /* Yaml.swiftmodule */,
+			);
+			path = build;
+			sourceTree = "<group>";
+		};
+		A366C07319F7DCCB0062825C = {
+			isa = PBXGroup;
+			children = (
+				A31983B71A48FB90008ADDC0 /* yaml.swift */,
+				A366C07E19F7DCCB0062825C /* Ergometer */,
+				A366C08F19F7DCCB0062825C /* ErgometerTests */,
+				A366C07D19F7DCCB0062825C /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A366C07D19F7DCCB0062825C /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A366C07C19F7DCCB0062825C /* Ergometer.app */,
+				A366C08C19F7DCCB0062825C /* ErgometerTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		A366C07E19F7DCCB0062825C /* Ergometer */ = {
+			isa = PBXGroup;
+			children = (
+				A366C08119F7DCCB0062825C /* AppDelegate.swift */,
+				A366C08319F7DCCB0062825C /* Images.xcassets */,
+				A366C08519F7DCCB0062825C /* MainMenu.xib */,
+				A366C07F19F7DCCB0062825C /* Supporting Files */,
+			);
+			path = Ergometer;
+			sourceTree = "<group>";
+		};
+		A366C07F19F7DCCB0062825C /* Supporting Files */ = {
+			isa = PBXGroup;
+			children = (
+				A366C08019F7DCCB0062825C /* Info.plist */,
+			);
+			name = "Supporting Files";
+			sourceTree = "<group>";
+		};
+		A366C08F19F7DCCB0062825C /* ErgometerTests */ = {
+			isa = PBXGroup;
+			children = (
+				A366C09219F7DCCB0062825C /* ErgometerTests.swift */,
+				A366C09019F7DCCB0062825C /* Supporting Files */,
+			);
+			path = ErgometerTests;
+			sourceTree = "<group>";
+		};
+		A366C09019F7DCCB0062825C /* Supporting Files */ = {
+			isa = PBXGroup;
+			children = (
+				A366C09119F7DCCB0062825C /* Info.plist */,
+			);
+			name = "Supporting Files";
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A366C07B19F7DCCB0062825C /* Ergometer */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A366C09619F7DCCB0062825C /* Build configuration list for PBXNativeTarget "Ergometer" */;
+			buildPhases = (
+				A366C07819F7DCCB0062825C /* Sources */,
+				A366C07919F7DCCB0062825C /* Frameworks */,
+				A366C07A19F7DCCB0062825C /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Ergometer;
+			productName = Ergometer;
+			productReference = A366C07C19F7DCCB0062825C /* Ergometer.app */;
+			productType = "com.apple.product-type.application";
+		};
+		A366C08B19F7DCCB0062825C /* ErgometerTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A366C09919F7DCCB0062825C /* Build configuration list for PBXNativeTarget "ErgometerTests" */;
+			buildPhases = (
+				A366C08819F7DCCB0062825C /* Sources */,
+				A366C08919F7DCCB0062825C /* Frameworks */,
+				A366C08A19F7DCCB0062825C /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A366C08E19F7DCCB0062825C /* PBXTargetDependency */,
+			);
+			name = ErgometerTests;
+			productName = ErgometerTests;
+			productReference = A366C08C19F7DCCB0062825C /* ErgometerTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A366C07419F7DCCB0062825C /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastUpgradeCheck = 0610;
+				ORGANIZATIONNAME = "Luke Stebbing";
+				TargetAttributes = {
+					A366C07B19F7DCCB0062825C = {
+						CreatedOnToolsVersion = 6.1;
+					};
+					A366C08B19F7DCCB0062825C = {
+						CreatedOnToolsVersion = 6.1;
+						TestTargetID = A366C07B19F7DCCB0062825C;
+					};
+				};
+			};
+			buildConfigurationList = A366C07719F7DCCB0062825C /* Build configuration list for PBXProject "Ergometer" */;
+			compatibilityVersion = "Xcode 3.2";
+			developmentRegion = English;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = A366C07319F7DCCB0062825C;
+			productRefGroup = A366C07D19F7DCCB0062825C /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A366C07B19F7DCCB0062825C /* Ergometer */,
+				A366C08B19F7DCCB0062825C /* ErgometerTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A366C07A19F7DCCB0062825C /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A31983C91A48FB90008ADDC0 /* test in Resources */,
+				A31983CA1A48FB90008ADDC0 /* Yaml.swiftdoc in Resources */,
+				A31983CB1A48FB90008ADDC0 /* Yaml.swiftmodule in Resources */,
+				A366C08419F7DCCB0062825C /* Images.xcassets in Resources */,
+				A31983C71A48FB90008ADDC0 /* .gitignore in Resources */,
+				A366C08719F7DCCB0062825C /* MainMenu.xib in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A366C08A19F7DCCB0062825C /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A366C07819F7DCCB0062825C /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A31983CF1A48FB90008ADDC0 /* Readme.md in Sources */,
+				A31983CE1A48FB90008ADDC0 /* Parser.swift in Sources */,
+				A31983CC1A48FB90008ADDC0 /* Makefile in Sources */,
+				A366C08219F7DCCB0062825C /* AppDelegate.swift in Sources */,
+				A31983D11A48FB90008ADDC0 /* Result.swift in Sources */,
+				A31983D21A48FB90008ADDC0 /* Test.swift in Sources */,
+				A31983D41A48FB90008ADDC0 /* Yaml.swift in Sources */,
+				A31983CD1A48FB90008ADDC0 /* Operators.swift in Sources */,
+				A31983D31A48FB90008ADDC0 /* Tokenizer.swift in Sources */,
+				A31983D01A48FB90008ADDC0 /* Regex.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A366C08819F7DCCB0062825C /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A366C09319F7DCCB0062825C /* ErgometerTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		A366C08E19F7DCCB0062825C /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A366C07B19F7DCCB0062825C /* Ergometer */;
+			targetProxy = A366C08D19F7DCCB0062825C /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin PBXVariantGroup section */
+		A366C08519F7DCCB0062825C /* MainMenu.xib */ = {
+			isa = PBXVariantGroup;
+			children = (
+				A366C08619F7DCCB0062825C /* Base */,
+			);
+			name = MainMenu.xib;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
+
+/* Begin XCBuildConfiguration section */
+		A366C09419F7DCCB0062825C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "-";
+				COPY_PHASE_STRIP = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 10.10;
+				MTL_ENABLE_DEBUG_INFO = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		A366C09519F7DCCB0062825C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "-";
+				COPY_PHASE_STRIP = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 10.10;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		A366C09719F7DCCB0062825C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "Developer ID Application: William Stebbing (UX8244AW2Z)";
+				COMBINE_HIDPI_IMAGES = YES;
+				INFOPLIST_FILE = Ergometer/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Ergometer",
+					"$(PROJECT_DIR)/yaml.swift/build",
+				);
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		A366C09819F7DCCB0062825C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "Developer ID Application: William Stebbing (UX8244AW2Z)";
+				COMBINE_HIDPI_IMAGES = YES;
+				INFOPLIST_FILE = Ergometer/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Ergometer",
+					"$(PROJECT_DIR)/yaml.swift/build",
+				);
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
+		A366C09A19F7DCCB0062825C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(DEVELOPER_FRAMEWORKS_DIR)",
+					"$(inherited)",
+				);
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				INFOPLIST_FILE = ErgometerTests/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks @loader_path/../Frameworks";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Ergometer.app/Contents/MacOS/Ergometer";
+			};
+			name = Debug;
+		};
+		A366C09B19F7DCCB0062825C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(DEVELOPER_FRAMEWORKS_DIR)",
+					"$(inherited)",
+				);
+				INFOPLIST_FILE = ErgometerTests/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks @loader_path/../Frameworks";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Ergometer.app/Contents/MacOS/Ergometer";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A366C07719F7DCCB0062825C /* Build configuration list for PBXProject "Ergometer" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A366C09419F7DCCB0062825C /* Debug */,
+				A366C09519F7DCCB0062825C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A366C09619F7DCCB0062825C /* Build configuration list for PBXNativeTarget "Ergometer" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A366C09719F7DCCB0062825C /* Debug */,
+				A366C09819F7DCCB0062825C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A366C09919F7DCCB0062825C /* Build configuration list for PBXNativeTarget "ErgometerTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A366C09A19F7DCCB0062825C /* Debug */,
+				A366C09B19F7DCCB0062825C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = A366C07419F7DCCB0062825C /* Project object */;
+}
