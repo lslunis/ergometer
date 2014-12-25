@@ -11,20 +11,37 @@ func systemClock() -> NSTimeInterval {
     return NSDate().timeIntervalSince1970
 }
 
+class File {
+    func put(data: String) -> Bool {
+        return true
+    }
+}
+
+class SystemFile: File {
+    
+    let path: String
+    let mode: String
+    
+    init(path: String, mode: String) {
+        self.path = path
+        self.mode = mode
+    }
+    
+    override func put(data: String) -> Bool {
+        let f = fopen(path, mode)
+        fputs(data, f)
+        fclose(f)
+        return true
+    }
+}
+
+func makeSystemFile(path: String?, mode: String) -> File {
+    return path == nil ? File() : SystemFile(path: path!, mode: mode)
+}
+
 enum Action {
     case Key(Int), Meta(Int), Click, Ignored
 }
-
-/*
-NSString *path = [@"~/Cellar/log/rsi-meter.log" stringByStandardizingPath];
-FILE *file = fopen([path UTF8String], "a");
-if (!file) {
-return;
-}
-
-fputs([string UTF8String], file);
-fclose(file);
-*/
 
 func makeAction(e: NSEvent!) -> Action {
     var t = e.type
@@ -55,13 +72,15 @@ func format(x: Double) -> NSAttributedString {
 
 class Meter {
     
+    let app: App
     var actionCost = 0
     var actionLimit: Int
     var firstActed: NSTimeInterval?
     var timeLimit: NSTimeInterval
     var restTime: NSTimeInterval
     
-    init(actionLimit: Int, timeLimit: NSTimeInterval = 0, restTime: NSTimeInterval = 0) {
+    init(app: App, actionLimit: Int, timeLimit: NSTimeInterval = 0, restTime: NSTimeInterval = 0) {
+        self.app = app
         self.actionLimit = actionLimit
         self.timeLimit = timeLimit
         self.restTime = restTime
@@ -76,9 +95,10 @@ class Meter {
     
     func rest(lastActed: NSTimeInterval, now: NSTimeInterval) -> NSTimeInterval {
         let restLeft = lastActed + restTime - now
-        if restTime > 0 && restLeft <= 0 {
-            actionCost = 0
-            firstActed = nil
+        let restNeeded = actionCost != 0 || firstActed != nil
+        if restTime > 0 && restLeft <= 0 && restNeeded {
+            app.mayGo = true
+            app.reset(self)
         }
         return restLeft
     }
@@ -102,8 +122,7 @@ class Meter {
     
     func expire() {
         if restTime == 0 {
-            actionCost = 0
-            firstActed = nil
+            app.reset(self)
         }
     }
 }
@@ -111,20 +130,35 @@ class Meter {
 class App {
     
     var lastActed = 0.0
-    var meters = [Meter(actionLimit: 0, timeLimit: 300, restTime: 900)]
+    var meters = [Meter]()
     var fadeTime : Float = 3.0
     var fadeValue : CGDisplayBlendFraction = 0.5
     let restDelay = 5.0
 
+    let clock: (() -> NSTimeInterval)
+    var errors: [String]
+    let id: String
+    let state: File
     var metaDowns = [Int]()
     var fadeUntil = 0.0
-    var clock: (() -> NSTimeInterval)
+    var mayGo = false
+    var updated = false
     
-    init(clock: (() -> NSTimeInterval)) {
+    init(clock: (() -> NSTimeInterval), makeFile: ((path: String?, mode: String) -> File), root: String?, errors: [String]) {
         self.clock = clock
+        self.errors = errors
+        let s = NSUUID().UUIDString
+        self.id = s.substringFromIndex(advance(s.endIndex, -12))
+        var statePath: String?
+        if root != nil {
+            statePath = "\(root!)/state-\(id).txt"
+        }
+        state = makeFile(path: statePath, mode: "w")
+        configure()
     }
     
     func configure() {
+        meters = [Meter(app: self, actionLimit: 0, timeLimit: 120, restTime: 60), Meter(app: self, actionLimit: 0, timeLimit: 300, restTime: 900)]
     }
     
     func meta(i: Int) -> Int {
@@ -161,11 +195,12 @@ class App {
         let i = cost(a)
         if i != 0 {
             lastActed = now
+            updated = true
         }
         meters.map { $0.add(i, now: now) }
     }
     
-    func fade(now: NSTimeInterval) {
+    func fade(now: NSTimeInterval, go: Bool) {
         if now < fadeUntil {
             return
         }
@@ -174,7 +209,9 @@ class App {
         if status != CGError(kCGErrorSuccess.value) {
             return
         }
-        CGDisplayFade(token, 0, CGDisplayBlendFraction(kCGDisplayBlendNormal), fadeValue, 0, 0, 0, 0)
+        let red: Float = go ? 0 : 1
+        let blue: Float = go ? 1 : 0
+        CGDisplayFade(token, 0, CGDisplayBlendFraction(kCGDisplayBlendNormal), fadeValue, red, 0, blue, 0)
         fadeUntil = now + Double(fadeTime)
     }
     
@@ -188,7 +225,7 @@ class App {
         let restStatusStrings = resting && ticking ? [format(minElement(restStatuses))] : []
         
         let meterStatuses = meters.map { $0.status(assumedLastActed) }
-        let shouldFade = any(meterStatuses.map { $0 < 0 })
+        let shouldStop = any(meterStatuses.map { $0 < 0 })
         let meterStatusStrings = meterStatuses.map(format)
         
         let statusBuffer = NSMutableAttributedString()
@@ -200,8 +237,20 @@ class App {
             statusBuffer.appendAttributedString(s)
         }
         
-        if shouldFade && !resting {
-            fade(now)
+        if shouldStop && !resting {
+            fade(now, go: false)
+        }
+        if mayGo {
+            mayGo = false
+            if !shouldStop {
+                fade(now, go: true)
+            }
+        }
+        
+        if updated {
+            let parts = ["\(lastActed)"] + meters.map { "\($0.actionCost) \($0.firstActed ?? 0)" }
+            let data = ",".join(parts)
+            updated = !state.put(data)
         }
         
         return (ticking, statusBuffer)
@@ -210,6 +259,12 @@ class App {
     func expire() {
         meters.map { $0.expire() }
     }
+    
+    func reset(m: Meter) {
+        m.actionCost = 0
+        m.firstActed = nil
+        updated = true
+    }
 }
 
 @NSApplicationMain
@@ -217,8 +272,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @IBOutlet var item: NSStatusItem!
     
-    var app = App(clock: systemClock)
-    var timer : NSTimer!
+    var app: App!
+    var timer: NSTimer!
     
     func act(e: NSEvent!) {
         app.act(makeAction(e))
@@ -238,11 +293,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(aNotification: NSNotification) {
-        let prompt : String = kAXTrustedCheckOptionPrompt.takeUnretainedValue()
+        let prompt: String = kAXTrustedCheckOptionPrompt.takeUnretainedValue()
         let trusted = AXIsProcessTrustedWithOptions([prompt: true]) != 0
         if !trusted {
             NSApplication.sharedApplication().terminate(self)
         }
+        
+        var root : String? = "~/Library/Application Support/Ergometer".stringByStandardizingPath
+        var errors = [String]()
+        var e : NSError?
+        if !NSFileManager.defaultManager().createDirectoryAtPath(root!, withIntermediateDirectories: true, attributes: nil, error: &e) {
+            root = nil
+            errors.append(e?.localizedDescription ?? "Unsaved data")
+        }
+        app = App(clock: systemClock, makeFile: makeSystemFile, root: root, errors: errors)
         
         item = NSStatusBar.systemStatusBar().statusItemWithLength(/* NSVariableStatusItemLength */ -1)
         tick()
