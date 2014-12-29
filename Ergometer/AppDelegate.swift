@@ -11,8 +11,28 @@ func systemClock() -> NSTimeInterval {
     return NSDate().timeIntervalSince1970
 }
 
+class Warn {
+
+    func warn(s: String, withErrno: Bool) -> Bool {
+        return false
+    }
+    
+    func with(s: String) -> Bool {
+        return warn(s, withErrno: false)
+    }
+    
+    func withErrno(s: String) -> Bool {
+        return warn(s, withErrno: true)
+    }
+}
+
 class File {
+    
     func put(data: String) -> Bool {
+        return true
+    }
+    
+    func move(pattern: String, template: String) -> Bool {
         return true
     }
 }
@@ -21,16 +41,31 @@ class SystemFile: File {
     
     let path: String
     let mode: String
+    let warn: Warn
     
     init(path: String, mode: String) {
         self.path = path
         self.mode = mode
+        warn = Warn()
     }
     
     override func put(data: String) -> Bool {
         let f = fopen(path, mode)
         fputs(data, f)
         fclose(f)
+        return true
+    }
+    
+    override func move(pattern: String, template: String) -> Bool {
+        var e: NSError?
+        let r = NSRegularExpression(pattern: pattern, options: NSRegularExpressionOptions(0), error: &e)
+        if r == nil {
+            return warn.with("Invalid pattern <\(pattern)> or template <\(template)>")
+        }
+        let s = r!.stringByReplacingMatchesInString(path, options: NSMatchingOptions(0), range: NSMakeRange(0, path.utf16Count), withTemplate: template)
+        if rename(path, s) != 0 {
+            return warn.withErrno("Couldn't rename <\(path)> to <\(s)>")
+        }
         return true
     }
 }
@@ -73,14 +108,16 @@ func format(x: Double) -> NSAttributedString {
 class Meter {
     
     let app: App
+    let name: String
     var actionCost = 0
     var actionLimit: Int
     var firstActed: NSTimeInterval?
     var timeLimit: NSTimeInterval
     var restTime: NSTimeInterval
     
-    init(app: App, actionLimit: Int, timeLimit: NSTimeInterval = 0, restTime: NSTimeInterval = 0) {
+    init(app: App, name: String, actionLimit: Int, timeLimit: NSTimeInterval = 0, restTime: NSTimeInterval = 0) {
         self.app = app
+        self.name = name
         self.actionLimit = actionLimit
         self.timeLimit = timeLimit
         self.restTime = restTime
@@ -144,6 +181,24 @@ class App {
     var mayGo = false
     var updated = false
     
+    func storeState() {
+        if updated {
+            let parts = ["\(lastActed)"] + map(meters) { "\($0.actionCost) \($0.firstActed ?? 0)" }
+            let data = ",".join(parts)
+            updated = !state.put(data)
+        }
+    }
+    
+    func loadState() {
+        
+    }
+
+
+
+    func configure() {
+        meters = [Meter(app: self, name: "s", actionLimit: 0, timeLimit: 120, restTime: 60), Meter(app: self, name: "m", actionLimit: 0, timeLimit: 300, restTime: 900)]
+    }
+
     init(clock: (() -> NSTimeInterval), makeFile: ((path: String?, mode: String) -> File), root: String?, errors: [String]) {
         self.clock = clock
         self.errors = errors
@@ -155,10 +210,8 @@ class App {
         }
         state = makeFile(path: statePath, mode: "w")
         configure()
-    }
-    
-    func configure() {
-        meters = [Meter(app: self, actionLimit: 0, timeLimit: 120, restTime: 60), Meter(app: self, actionLimit: 0, timeLimit: 300, restTime: 900)]
+        expire()
+        tick()
     }
     
     func meta(i: Int) -> Int {
@@ -197,7 +250,7 @@ class App {
             lastActed = now
             updated = true
         }
-        meters.map { $0.add(i, now: now) }
+        map(meters) { $0.add(i, now: now) }
     }
     
     func fade(now: NSTimeInterval, go: Bool) {
@@ -220,11 +273,11 @@ class App {
         let resting = now - lastActed > restDelay
         let assumedLastActed = resting ? lastActed : now
         
-        let restStatuses = meters.map { $0.rest(assumedLastActed, now: now) }.filter { $0 > 0 }
+        let restStatuses = map(meters) { $0.rest(assumedLastActed, now: now) }.filter { $0 > 0 }
         let ticking = !restStatuses.isEmpty
         let restStatusStrings = resting && ticking ? [format(minElement(restStatuses))] : []
         
-        let meterStatuses = meters.map { $0.status(assumedLastActed) }
+        let meterStatuses = map(meters) { $0.status(assumedLastActed) }
         let shouldStop = any(meterStatuses.map { $0 < 0 })
         let meterStatusStrings = meterStatuses.map(format)
         
@@ -247,23 +300,23 @@ class App {
             }
         }
         
-        if updated {
-            let parts = ["\(lastActed)"] + meters.map { "\($0.actionCost) \($0.firstActed ?? 0)" }
-            let data = ",".join(parts)
-            updated = !state.put(data)
-        }
-        
+        storeState()
+
         return (ticking, statusBuffer)
     }
     
     func expire() {
-        meters.map { $0.expire() }
+        map(meters) { $0.expire() }
     }
     
     func reset(m: Meter) {
         m.actionCost = 0
         m.firstActed = nil
         updated = true
+    }
+    
+    func stop() {
+        tick()
     }
 }
 
@@ -272,11 +325,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @IBOutlet var item: NSStatusItem!
     
-    var app: App!
-    var timer: NSTimer!
+    var app: App?
+    var timer: NSTimer?
     
     func act(e: NSEvent!) {
-        app.act(makeAction(e))
+        if app == nil {
+            return
+        }
+        app!.act(makeAction(e))
         if timer == nil {
             timer = NSTimer.scheduledTimerWithTimeInterval(
                 1.0, target: self, selector: "tick", userInfo: nil, repeats: true)
@@ -284,10 +340,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     func tick() {
-        let r = app.tick()
+        if app == nil {
+            return
+        }
+        let r = app!.tick()
         item.button!.attributedTitle = r.statusString
         if timer != nil && !r.ticking {
-            timer.invalidate()
+            timer!.invalidate()
             timer = nil
         }
     }
@@ -296,7 +355,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let prompt: String = kAXTrustedCheckOptionPrompt.takeUnretainedValue()
         let trusted = AXIsProcessTrustedWithOptions([prompt: true]) != 0
         if !trusted {
-            NSApplication.sharedApplication().terminate(self)
+            NSApplication.sharedApplication().terminate(nil)
+            return
         }
         
         var root : String? = "~/Library/Application Support/Ergometer".stringByStandardizingPath
@@ -306,10 +366,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             root = nil
             errors.append(e?.localizedDescription ?? "Unsaved data")
         }
-        app = App(clock: systemClock, makeFile: makeSystemFile, root: root, errors: errors)
         
         item = NSStatusBar.systemStatusBar().statusItemWithLength(/* NSVariableStatusItemLength */ -1)
-        tick()
+        app = App(clock: systemClock, makeFile: makeSystemFile, root: root, errors: errors)
         let mask : NSEventMask =
             .KeyDownMask |
             .FlagsChangedMask |
