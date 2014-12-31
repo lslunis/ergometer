@@ -7,7 +7,7 @@ func any(bools: [Bool]) -> Bool {
     return !bools.filter { $0 }.isEmpty
 }
 
-func systemClock() -> NSTimeInterval {
+func systemClock() -> Double {
     return NSDate().timeIntervalSince1970
 }
 
@@ -94,6 +94,10 @@ func makeAction(e: NSEvent!) -> Action {
     }
 }
 
+func has(x: Double?) -> Bool {
+    return (x ?? 0) != 0
+}
+
 let redForeground = [NSForegroundColorAttributeName: NSColor.redColor()]
 
 func format(i: Int) -> NSAttributedString {
@@ -109,58 +113,99 @@ class Meter {
     
     let app: App
     let name: String
-    var actionCost = 0
-    var actionLimit: Int
-    var firstActed: NSTimeInterval?
-    var timeLimit: NSTimeInterval
-    var restTime: NSTimeInterval
+    var actionCost = 0.0
+    var actionLimit: Double?
+    var firstActed: Double?
+    var timeLimit: Double?
+    var restTime: Double = 0
     
-    init(app: App, name: String, actionLimit: Int, timeLimit: NSTimeInterval = 0, restTime: NSTimeInterval = 0) {
+    init(app: App, name: String) {
         self.app = app
         self.name = name
-        self.actionLimit = actionLimit
-        self.timeLimit = timeLimit
-        self.restTime = restTime
     }
     
-    func add(i: Int, now: NSTimeInterval) {
-        actionCost += i
-        if timeLimit > 0 {
+    func add(x: Double, now: Double) {
+        actionCost += x
+        if has(timeLimit) {
             firstActed = firstActed ?? now
         }
     }
     
-    func rest(lastActed: NSTimeInterval, now: NSTimeInterval) -> NSTimeInterval {
+    func rest(lastActed: Double, now: Double) -> Double {
         let restLeft = lastActed + restTime - now
         let restNeeded = actionCost != 0 || firstActed != nil
-        if restTime > 0 && restLeft <= 0 && restNeeded {
+        if has(restTime) && restLeft <= 0 && restNeeded {
             app.mayGo = true
             app.reset(self)
         }
         return restLeft
     }
     
-    func status(lastActed: NSTimeInterval) -> Int {
-        let timed = timeLimit != 0
+    func status(lastActed: Double) -> Double {
+        let timed = has(timeLimit)
         let activeElapsed = firstActed != nil ? lastActed - firstActed! : 0
-        if actionLimit != 0 {
-            var value = actionLimit - actionCost
+        if has(actionLimit) {
+            var value = actionLimit! - actionCost
             if timed {
-                var timeCost = activeElapsed / timeLimit * Double(actionLimit)
-                value -= Int(timeCost)
+                var timeCost = activeElapsed / timeLimit! * actionLimit!
+                value -= timeCost
             }
             return value
         }
         if timed {
-            return Int(timeLimit - activeElapsed)
+            return timeLimit! - activeElapsed
         }
         return actionCost
     }
     
     func expire() {
-        if restTime == 0 {
+        if has(restTime) {
             app.reset(self)
         }
+    }
+}
+
+protocol MeterData {
+    var name: String { get }
+    func copyTo(m: Meter)
+}
+
+class MeterConf: MeterData {
+    
+    let name: String
+    let actionLimit: Double?
+    let timeLimit: Double?
+    let restTime: Double?
+    
+    init(name: String, actionLimit: Double?, timeLimit: Double?, restTime: Double?) {
+        self.name = name
+        self.actionLimit = actionLimit
+        self.timeLimit = timeLimit
+        self.restTime = restTime
+    }
+    
+    func copyTo(m: Meter) {
+        m.actionLimit = actionLimit
+        m.timeLimit = timeLimit
+        m.restTime = restTime ?? 0
+    }
+}
+
+class MeterState: MeterData {
+    
+    let name: String
+    let actionCost: Double
+    let firstActed: Double
+    
+    init(name: String, actionCost: Double, firstActed: Double) {
+        self.name = name
+        self.actionCost = actionCost
+        self.firstActed = firstActed
+    }
+    
+    func copyTo(m: Meter) {
+        m.actionCost = actionCost
+        m.firstActed = firstActed
     }
 }
 
@@ -172,7 +217,7 @@ class App {
     var fadeValue : CGDisplayBlendFraction = 0.5
     let restDelay = 5.0
 
-    let clock: (() -> NSTimeInterval)
+    let clock: (() -> Double)
     var errors: [String]
     let id: String
     let state: File
@@ -181,25 +226,56 @@ class App {
     var mayGo = false
     var updated = false
     
+    func setMeters(newList: [MeterData]) {
+        var olds = [String:Meter]()
+        for m in meters {
+            olds[m.name] = m
+        }
+        var news = [String:MeterData]()
+        for m in newList {
+            news[m.name] = m
+        }
+        var keys = [String:Int]()
+        for k in olds.keys {
+            keys[k] = 1
+        }
+        for k in news.keys {
+            keys[k] = 1
+        }
+        for k in keys.keys {
+            if let n = news[k] {
+                if olds[k] == nil {
+                    olds[k] = Meter(app: self, name: k)
+                }
+                n.copyTo(olds[k]!)
+            }
+            else {
+                olds.removeValueForKey(k)
+            }
+        }
+        meters = newList.map { olds[$0.name]! }
+    }
+    
     func storeState() {
         if updated {
-            let parts = ["\(lastActed)"] + map(meters) { "\($0.actionCost) \($0.firstActed ?? 0)" }
+            let parts = map(meters) { "\($0.name) \($0.actionCost) \($0.firstActed ?? 0)" } + ["\(lastActed)"]
             let data = ",".join(parts)
             updated = !state.put(data)
         }
     }
     
-    func loadState() {
-        
+    func loadState() -> Bool {
+        let data = ""
+        var parts = split(data) { $0 == "," }.map { split($0) { $0 == " " } }
+        lastActed = (parts.removeLast()[0] as NSString).doubleValue
+        return true
     }
-
-
 
     func configure() {
-        meters = [Meter(app: self, name: "s", actionLimit: 0, timeLimit: 120, restTime: 60), Meter(app: self, name: "m", actionLimit: 0, timeLimit: 300, restTime: 900)]
+        setMeters([MeterConf(name: "s", actionLimit: nil, timeLimit: 60, restTime: 60), MeterConf(name: "m", actionLimit: nil, timeLimit: 420, restTime: 900)])
     }
 
-    init(clock: (() -> NSTimeInterval), makeFile: ((path: String?, mode: String) -> File), root: String?, errors: [String]) {
+    init(clock: (() -> Double), makeFile: ((path: String?, mode: String) -> File), root: String?, errors: [String]) {
         self.clock = clock
         self.errors = errors
         let s = NSUUID().UUIDString
@@ -214,7 +290,7 @@ class App {
         tick()
     }
     
-    func meta(i: Int) -> Int {
+    func meta(i: Int) -> Double {
         let d = i - metaDowns.count
         if d > 0 {
             metaDowns += Array(count: d, repeatedValue: 0)
@@ -232,7 +308,7 @@ class App {
         return 1
     }
     
-    func cost(a: Action) -> Int {
+    func cost(a: Action) -> Double {
         switch a {
         case .Meta(let i):
             return meta(i)
@@ -245,15 +321,16 @@ class App {
 
     func act(a: Action) {
         let now = clock()
-        let i = cost(a)
-        if i != 0 {
-            lastActed = now
-            updated = true
+        let x = cost(a)
+        if !has(x) {
+            return
         }
-        map(meters) { $0.add(i, now: now) }
+        lastActed = now
+        updated = true
+        map(meters) { $0.add(x, now: now) }
     }
     
-    func fade(now: NSTimeInterval, go: Bool) {
+    func fade(now: Double, go: Bool) {
         if now < fadeUntil {
             return
         }
@@ -314,10 +391,6 @@ class App {
         m.firstActed = nil
         updated = true
     }
-    
-    func stop() {
-        tick()
-    }
 }
 
 @NSApplicationMain
@@ -359,7 +432,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         
-        var root : String? = "~/Library/Application Support/Ergometer".stringByStandardizingPath
+        var root : String? = "~/Library/Application Support/Ergometer/state".stringByStandardizingPath
         var errors = [String]()
         var e : NSError?
         if !NSFileManager.defaultManager().createDirectoryAtPath(root!, withIntermediateDirectories: true, attributes: nil, error: &e) {
