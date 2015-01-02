@@ -11,21 +11,6 @@ func systemClock() -> Double {
     return NSDate().timeIntervalSince1970
 }
 
-class Warn {
-
-    func warn(s: String, withErrno: Bool) -> Bool {
-        return false
-    }
-    
-    func with(s: String) -> Bool {
-        return warn(s, withErrno: false)
-    }
-    
-    func withErrno(s: String) -> Bool {
-        return warn(s, withErrno: true)
-    }
-}
-
 class File {
     
     func put(data: String) -> Bool {
@@ -41,18 +26,25 @@ class SystemFile: File {
     
     let path: String
     let mode: String
-    let warn: Warn
+    let errorLog: ErrorLog
     
-    init(path: String, mode: String) {
+    init(path: String, mode: String, errorLog: ErrorLog) {
         self.path = path
         self.mode = mode
-        warn = Warn()
+        self.errorLog = errorLog
     }
-    
+
     override func put(data: String) -> Bool {
         let f = fopen(path, mode)
-        fputs(data, f)
-        fclose(f)
+        if f == nil {
+            return errorLog.warn("Couldn't open <\(path)>", withErrno: true)
+        }
+        if fputs(data, f) == EOF {
+            return errorLog.warn("Couldn't write to <\(path)>", withErrno: true)
+        }
+        if fclose(f) == EOF {
+            return errorLog.warn("Couldn't close <\(path)>", withErrno: true)
+        }
         return true
     }
     
@@ -60,18 +52,27 @@ class SystemFile: File {
         var e: NSError?
         let r = NSRegularExpression(pattern: pattern, options: NSRegularExpressionOptions(0), error: &e)
         if r == nil {
-            return warn.with("Invalid pattern <\(pattern)> or template <\(template)>")
+            return errorLog.warn("Invalid pattern <\(pattern)>")
         }
         let s = r!.stringByReplacingMatchesInString(path, options: NSMatchingOptions(0), range: NSMakeRange(0, path.utf16Count), withTemplate: template)
         if rename(path, s) != 0 {
-            return warn.withErrno("Couldn't rename <\(path)> to <\(s)>")
+            return errorLog.warn("Couldn't rename <\(path)> to <\(s)>", withErrno: true)
         }
         return true
     }
 }
 
-func makeSystemFile(path: String?, mode: String) -> File {
-    return path == nil ? File() : SystemFile(path: path!, mode: mode)
+func makeSystemFile(path: String?, mode: String, errorLog: ErrorLog) -> File {
+    return path == nil ? File() : SystemFile(path: path!, mode: mode, errorLog: errorLog)
+}
+
+class ErrorLog {
+    
+    var count = 0
+    
+    func warn(s: String, withErrno: Bool = false) -> Bool {
+        return false
+    }
 }
 
 enum Action {
@@ -98,15 +99,14 @@ func has(x: Double?) -> Bool {
     return (x ?? 0) != 0
 }
 
-let redForeground = [NSForegroundColorAttributeName: NSColor.redColor()]
-
-func format(i: Int) -> NSAttributedString {
-    let style = i < 0 ? redForeground : [:]
-    return NSAttributedString(string: String(i), attributes: style)
+func red(s: String) -> NSAttributedString {
+    let style = [NSForegroundColorAttributeName: NSColor.redColor()]
+    return NSAttributedString(string: s, attributes: style)
 }
 
-func format(x: Double) -> NSAttributedString {
-    return format(Int(round(x)))
+func redUnlessPositive(x: Double) -> NSAttributedString {
+    let s = "\(Int(round(x)))"
+    return x > 0 ? NSAttributedString(string: s) : red(s)
 }
 
 class Meter {
@@ -218,14 +218,14 @@ class App {
     let restDelay = 5.0
 
     let clock: (() -> Double)
-    var errors: [String]
+    let errorLog: ErrorLog
     let id: String
     let state: File
     var metaDowns = [Int]()
     var fadeUntil = 0.0
     var mayGo = false
     var updated = false
-    
+
     func setMeters(newList: [MeterData]) {
         var olds = [String:Meter]()
         for m in meters {
@@ -272,22 +272,21 @@ class App {
     }
 
     func configure() {
-        setMeters([MeterConf(name: "s", actionLimit: nil, timeLimit: 60, restTime: 60), MeterConf(name: "m", actionLimit: nil, timeLimit: 420, restTime: 900)])
+        setMeters([MeterConf(name: "s", actionLimit: nil, timeLimit: 45, restTime: 45), MeterConf(name: "m", actionLimit: nil, timeLimit: 420, restTime: 900)])
     }
 
-    init(clock: (() -> Double), makeFile: ((path: String?, mode: String) -> File), root: String?, errors: [String]) {
+    init(clock: (() -> Double), makeFile: ((path: String?, mode: String, errorLog: ErrorLog) -> File), root: String?, errorLog: ErrorLog) {
         self.clock = clock
-        self.errors = errors
+        self.errorLog = errorLog
         let s = NSUUID().UUIDString
-        self.id = s.substringFromIndex(advance(s.endIndex, -12))
+        id = s.substringFromIndex(advance(s.endIndex, -12))
         var statePath: String?
         if root != nil {
-            statePath = "\(root!)/state-\(id).txt"
+            statePath = "\(root!)/state/\(id).txt"
         }
-        state = makeFile(path: statePath, mode: "w")
+        state = makeFile(path: statePath, mode: "w", errorLog: errorLog)
         configure()
         expire()
-        tick()
     }
     
     func meta(i: Int) -> Double {
@@ -334,14 +333,18 @@ class App {
         if now < fadeUntil {
             return
         }
+        let success = CGError(kCGErrorSuccess.value)
         var token = CGDisplayFadeReservationToken(kCGDisplayFadeReservationInvalidToken)
-        let status = CGAcquireDisplayFadeReservation(fadeTime, &token)
-        if status != CGError(kCGErrorSuccess.value) {
+        var e = CGAcquireDisplayFadeReservation(fadeTime, &token)
+        if e != success {
             return
         }
         let red: Float = go ? 0 : 1
         let blue: Float = go ? 1 : 0
-        CGDisplayFade(token, 0, CGDisplayBlendFraction(kCGDisplayBlendNormal), fadeValue, red, 0, blue, 0)
+        e = CGDisplayFade(token, 0, CGDisplayBlendFraction(kCGDisplayBlendNormal), fadeValue, red, 0, blue, 0)
+        if e != success {
+            errorLog.warn("CGError returned \(e.value)")
+        }
         fadeUntil = now + Double(fadeTime)
     }
     
@@ -349,17 +352,18 @@ class App {
         let now = clock()
         let resting = now - lastActed > restDelay
         let assumedLastActed = resting ? lastActed : now
+        let errorStatusStrings = errorLog.count > 0 ? [red("\(errorLog.count)")] : []
         
         let restStatuses = map(meters) { $0.rest(assumedLastActed, now: now) }.filter { $0 > 0 }
         let ticking = !restStatuses.isEmpty
-        let restStatusStrings = resting && ticking ? [format(minElement(restStatuses))] : []
+        let restStatusStrings = resting && ticking ? [redUnlessPositive(minElement(restStatuses))] : []
         
         let meterStatuses = map(meters) { $0.status(assumedLastActed) }
         let shouldStop = any(meterStatuses.map { $0 < 0 })
-        let meterStatusStrings = meterStatuses.map(format)
+        let meterStatusStrings = meterStatuses.map(redUnlessPositive)
         
         let statusBuffer = NSMutableAttributedString()
-        let statusStrings = restStatusStrings + meterStatusStrings
+        let statusStrings = errorStatusStrings + restStatusStrings + meterStatusStrings
         for (i, s) in enumerate(statusStrings) {
             if i > 0 {
                 statusBuffer.appendAttributedString(NSAttributedString(string: "  "))
@@ -395,9 +399,8 @@ class App {
 
 @NSApplicationMain
 class AppDelegate: NSObject, NSApplicationDelegate {
-
-    @IBOutlet var item: NSStatusItem!
     
+    var item: NSStatusItem?
     var app: App?
     var timer: NSTimer?
     
@@ -417,7 +420,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         let r = app!.tick()
-        item.button!.attributedTitle = r.statusString
+        item!.button!.attributedTitle = r.statusString
         if timer != nil && !r.ticking {
             timer!.invalidate()
             timer = nil
@@ -425,23 +428,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(aNotification: NSNotification) {
+        item = NSStatusBar.systemStatusBar().statusItemWithLength(/* NSVariableStatusItemLength */ -1)
         let prompt: String = kAXTrustedCheckOptionPrompt.takeUnretainedValue()
         let trusted = AXIsProcessTrustedWithOptions([prompt: true]) != 0
-        if !trusted {
+        if item == nil || !trusted {
             NSApplication.sharedApplication().terminate(nil)
             return
         }
         
-        var root : String? = "~/Library/Application Support/Ergometer/state".stringByStandardizingPath
-        var errors = [String]()
+        let errorLog = ErrorLog()
+        var root : String? = "~/Library/Application Support/Ergometer".stringByStandardizingPath
         var e : NSError?
         if !NSFileManager.defaultManager().createDirectoryAtPath(root!, withIntermediateDirectories: true, attributes: nil, error: &e) {
             root = nil
-            errors.append(e?.localizedDescription ?? "Unsaved data")
+            errorLog.warn("Couldn't create <\(root)>" + (e != nil ? ": " + e!.localizedDescription : ""))
         }
         
-        item = NSStatusBar.systemStatusBar().statusItemWithLength(/* NSVariableStatusItemLength */ -1)
-        app = App(clock: systemClock, makeFile: makeSystemFile, root: root, errors: errors)
+        app = App(clock: systemClock, makeFile: makeSystemFile, root: root, errorLog: errorLog)
+        tick()
         let mask : NSEventMask =
             .KeyDownMask |
             .FlagsChangedMask |
