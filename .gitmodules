@@ -1,3 +1,3 @@
-[submodule "yaml.swift"]
-	path = yaml.swift
-	url = https://github.com/behrang/yaml.swift
+[submodule "SwiftyJSON"]
+	path = SwiftyJSON
+	url = https://github.com/SwiftyJSON/SwiftyJSON.git

@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A32B07C81A5B63FC0034CC6E /* Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = A32B07C51A5B63FC0034CC6E /* Info.plist */; };
+		A32B07C91A5B63FC0034CC6E /* SwiftyJSON.swift in Sources */ = {isa = PBXBuildFile; fileRef = A32B07C71A5B63FC0034CC6E /* SwiftyJSON.swift */; };
 		A366C08219F7DCCB0062825C /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A366C08119F7DCCB0062825C /* AppDelegate.swift */; };
 		A366C08419F7DCCB0062825C /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A366C08319F7DCCB0062825C /* Images.xcassets */; };
 		A366C08719F7DCCB0062825C /* MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = A366C08519F7DCCB0062825C /* MainMenu.xib */; };
@@ -24,6 +26,9 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		A32B07C51A5B63FC0034CC6E /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A32B07C61A5B63FC0034CC6E /* SwiftyJSON.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SwiftyJSON.h; sourceTree = "<group>"; };
+		A32B07C71A5B63FC0034CC6E /* SwiftyJSON.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SwiftyJSON.swift; sourceTree = "<group>"; };
 		A366C07C19F7DCCB0062825C /* Ergometer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Ergometer.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A366C08019F7DCCB0062825C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A366C08119F7DCCB0062825C /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -52,12 +57,24 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		A32B07C41A5B63FC0034CC6E /* Source */ = {
+			isa = PBXGroup;
+			children = (
+				A32B07C51A5B63FC0034CC6E /* Info.plist */,
+				A32B07C61A5B63FC0034CC6E /* SwiftyJSON.h */,
+				A32B07C71A5B63FC0034CC6E /* SwiftyJSON.swift */,
+			);
+			name = Source;
+			path = SwiftyJSON/Source;
+			sourceTree = "<group>";
+		};
 		A366C07319F7DCCB0062825C = {
 			isa = PBXGroup;
 			children = (
 				A366C07E19F7DCCB0062825C /* Ergometer */,
 				A366C08F19F7DCCB0062825C /* ErgometerTests */,
 				A366C07D19F7DCCB0062825C /* Products */,
+				A32B07C41A5B63FC0034CC6E /* Source */,
 			);
 			sourceTree = "<group>";
 		};
@@ -188,6 +205,7 @@
 			files = (
 				A366C08419F7DCCB0062825C /* Images.xcassets in Resources */,
 				A366C08719F7DCCB0062825C /* MainMenu.xib in Resources */,
+				A32B07C81A5B63FC0034CC6E /* Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -206,6 +224,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A366C08219F7DCCB0062825C /* AppDelegate.swift in Sources */,
+				A32B07C91A5B63FC0034CC6E /* SwiftyJSON.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -256,7 +275,7 @@
 				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
-				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_IDENTITY = "Developer ID Application: William Stebbing (UX8244AW2Z)";
 				COPY_PHASE_STRIP = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu99;
@@ -298,7 +317,7 @@
 				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
-				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_IDENTITY = "Developer ID Application: William Stebbing (UX8244AW2Z)";
 				COPY_PHASE_STRIP = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
@@ -320,6 +339,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ANALYZER_SECURITY_FLOATLOOPCOUNTER = YES;
+				CLANG_ANALYZER_SECURITY_INSECUREAPI_RAND = YES;
+				CLANG_ANALYZER_SECURITY_INSECUREAPI_STRCPY = YES;
 				CODE_SIGN_IDENTITY = "Developer ID Application: William Stebbing (UX8244AW2Z)";
 				COMBINE_HIDPI_IMAGES = YES;
 				INFOPLIST_FILE = Ergometer/Info.plist;
@@ -327,9 +349,10 @@
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(PROJECT_DIR)/Ergometer",
-					"$(PROJECT_DIR)/yaml.swift/build",
 				);
+				OTHER_LDFLAGS = "";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_INCLUDE_PATHS = "";
 			};
 			name = Debug;
 		};
@@ -337,6 +360,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ANALYZER_SECURITY_FLOATLOOPCOUNTER = YES;
+				CLANG_ANALYZER_SECURITY_INSECUREAPI_RAND = YES;
+				CLANG_ANALYZER_SECURITY_INSECUREAPI_STRCPY = YES;
 				CODE_SIGN_IDENTITY = "Developer ID Application: William Stebbing (UX8244AW2Z)";
 				COMBINE_HIDPI_IMAGES = YES;
 				INFOPLIST_FILE = Ergometer/Info.plist;
@@ -344,9 +370,10 @@
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(PROJECT_DIR)/Ergometer",
-					"$(PROJECT_DIR)/yaml.swift/build",
 				);
+				OTHER_LDFLAGS = "";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_INCLUDE_PATHS = "";
 			};
 			name = Release;
 		};

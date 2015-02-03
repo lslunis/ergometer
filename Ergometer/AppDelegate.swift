@@ -11,20 +11,28 @@ func systemClock() -> Double {
     return NSDate().timeIntervalSince1970
 }
 
+func parentDir(path: String) -> String {
+    return path.stringByDeletingLastPathComponent
+}
+
 class File {
     
-    func put(data: String) -> Bool {
+    func json() -> JSON {
+        return nil
+    }
+    
+    func write(data: String) -> Bool {
         return true
     }
     
-    func move(pattern: String, template: String) -> Bool {
+    func move(dir: String) -> Bool {
         return true
     }
 }
 
 class SystemFile: File {
     
-    let path: String
+    var path: String
     let mode: String
     let errorLog: ErrorLog
     
@@ -34,7 +42,26 @@ class SystemFile: File {
         self.errorLog = errorLog
     }
 
-    override func put(data: String) -> Bool {
+    func makeDir(dir: String) -> Bool {
+        var e : NSError?
+        let r = NSFileManager.defaultManager().createDirectoryAtPath(dir, withIntermediateDirectories: true, attributes: nil, error: &e)
+        if !r {
+            errorLog.warn("Couldn't mkdir <\(dir)>", with: e)
+        }
+        return r
+    }
+
+    override func json() -> JSON {
+        if let s = NSFileManager.defaultManager().contentsAtPath(path) {
+            return JSON(data: s)
+        }
+        return nil
+    }
+    
+    override func write(data: String) -> Bool {
+        if !makeDir(parentDir(path)) {
+            return false
+        }
         let f = fopen(path, mode)
         if f == nil {
             return errorLog.warn("Couldn't open <\(path)>", withErrno: true)
@@ -48,16 +75,15 @@ class SystemFile: File {
         return true
     }
     
-    override func move(pattern: String, template: String) -> Bool {
-        var e: NSError?
-        let r = NSRegularExpression(pattern: pattern, options: NSRegularExpressionOptions(0), error: &e)
-        if r == nil {
-            return errorLog.warn("Invalid pattern <\(pattern)>")
+    override func move(dir: String) -> Bool {
+        if !makeDir(dir) {
+            return false
         }
-        let s = r!.stringByReplacingMatchesInString(path, options: NSMatchingOptions(0), range: NSMakeRange(0, path.utf16Count), withTemplate: template)
-        if rename(path, s) != 0 {
-            return errorLog.warn("Couldn't rename <\(path)> to <\(s)>", withErrno: true)
+        let dest = "/".join([dir, path.lastPathComponent])
+        if rename(path, dest) != 0 {
+            return errorLog.warn("Couldn't rename <\(path)> to <\(dest)>", withErrno: true)
         }
+        path = dest
         return true
     }
 }
@@ -66,12 +92,51 @@ func makeSystemFile(path: String?, mode: String, errorLog: ErrorLog) -> File {
     return path == nil ? File() : SystemFile(path: path!, mode: mode, errorLog: errorLog)
 }
 
+func listDir(dir: String, errorLog: ErrorLog) -> [File] {
+    var e: NSError?
+    if let files = NSFileManager.defaultManager().contentsOfDirectoryAtPath(dir, error: &e) {
+        return files.map { SystemFile(path: "\(dir)/\($0)", mode: "w", errorLog: errorLog) }
+    }
+    return [File]()
+}
+
+func formatDate(date: NSDate) -> String {
+    let formatter = NSDateFormatter()
+    formatter.dateFormat = "yyyy-MM-dd' 'HH:mm:ss' 'ZZZZZ"
+    return formatter.stringFromDate(date)
+}
+
 class ErrorLog {
     
     var count = 0
+    let root: String?
+    let logFile: File?
     
-    func warn(s: String, withErrno: Bool = false) -> Bool {
+    init(root: String?) {
+        if root != nil {
+            logFile = SystemFile(path: "\(root!)/error.log", mode: "a", errorLog: ErrorLog(root: nil))
+        }
+    }
+    
+    func warn(s: String, withErrno: Bool = false, level: String = "warn") -> Bool {
+        if logFile == nil {
+            return false
+        }
+        
+        if level == "warn" {
+            ++count
+        }
+        logFile!.write("[\(formatDate(NSDate()))][\(level)] \(s)\n")
+        
         return false
+    }
+    
+    func info(s: String) -> Bool {
+        return warn(s, withErrno: false, level: "info")
+    }
+    
+    func warn(s: String, with: NSError?) -> Bool {
+         return warn(s + (with != nil ? ": " + with!.localizedDescription : ""))
     }
 }
 
@@ -145,12 +210,7 @@ class Meter {
         let timed = has(timeLimit)
         let activeElapsed = firstActed != nil ? lastActed - firstActed! : 0
         if has(actionLimit) {
-            var value = actionLimit! - actionCost
-            if timed {
-                var timeCost = activeElapsed / timeLimit! * actionLimit!
-                value -= timeCost
-            }
-            return value
+            return actionLimit! - actionCost
         }
         if timed {
             return timeLimit! - activeElapsed
@@ -159,7 +219,7 @@ class Meter {
     }
     
     func expire() {
-        if has(restTime) {
+        if !has(restTime) {
             app.reset(self)
         }
     }
@@ -195,9 +255,9 @@ class MeterState: MeterData {
     
     let name: String
     let actionCost: Double
-    let firstActed: Double
+    let firstActed: Double?
     
-    init(name: String, actionCost: Double, firstActed: Double) {
+    init(name: String, actionCost: Double, firstActed: Double?) {
         self.name = name
         self.actionCost = actionCost
         self.firstActed = firstActed
@@ -209,17 +269,32 @@ class MeterState: MeterData {
     }
 }
 
-class App {
-    
-    var lastActed = 0.0
-    var meters = [Meter]()
-    var fadeTime : Float = 3.0
-    var fadeValue : CGDisplayBlendFraction = 0.5
-    let restDelay = 5.0
+func parseMeterState(j: JSON) -> MeterState? {
+    if let n = j["name"].string {
+        if let ac = j["actionCost"].double {
+            return MeterState(name: n, actionCost: ac, firstActed: j["firstActed"].double)
+        }
+    }
+    return nil
+}
 
+class App {
+
+    // Serialized state
+    var lastActed = 0.0
+    var activationCost = 0.0
+    var meters = [Meter]()
+    
+    // Potential Config
+    var fadeTime : Float = 3.0
+    var fadeValue : CGDisplayBlendFraction = 0.8
+    let restDelay = 5.0
+    let activationLimit = 10.0
+    
+    // Volatile State
     let clock: (() -> Double)
     let errorLog: ErrorLog
-    let id: String
+    let stopDir: String
     let state: File
     var metaDowns = [Int]()
     var fadeUntil = 0.0
@@ -256,35 +331,76 @@ class App {
         meters = newList.map { olds[$0.name]! }
     }
     
-    func storeState() {
-        if updated {
-            let parts = map(meters) { "\($0.name) \($0.actionCost) \($0.firstActed ?? 0)" } + ["\(lastActed)"]
-            let data = ",".join(parts)
-            updated = !state.put(data)
+    func parseMeters(y: JSON, parseMeter: ((JSON) -> MeterData?)) -> [MeterData]? {
+        let yms = y["meters"].array
+        if yms == nil {
+            return nil
         }
+        var meters = [MeterData]()
+        for ym in yms! {
+            if let m = parseMeterState(ym) {
+                meters.append(m)
+            }
+            else {
+                return nil
+            }
+        }
+        return meters
     }
     
+    func storeState() {
+        if updated {
+            let m = ",".join(map(meters) {
+                let firstActed = $0.firstActed != nil ? "\($0.firstActed!)" : "null"
+                return "{\"name\":\"\($0.name)\",\"actionCost\":\($0.actionCost),\"firstActed\":\(firstActed)}"
+                })
+            let data = "{\"meters\":[\(m)],\"lastActed\":\(lastActed)}"
+            updated = !state.write(data)
+        }
+    }
+
     func loadState() -> Bool {
-        let data = ""
-        var parts = split(data) { $0 == "," }.map { split($0) { $0 == " " } }
-        lastActed = (parts.removeLast()[0] as NSString).doubleValue
-        return true
+        let y = state.json()
+        let m = parseMeters(y, parseMeter: parseMeterState)
+        let r = m != nil
+        if r {
+            setMeters(m!)
+        }
+        lastActed = y["lastActed"].double!
+        return r
     }
 
     func configure() {
-        setMeters([MeterConf(name: "s", actionLimit: nil, timeLimit: 45, restTime: 45), MeterConf(name: "m", actionLimit: nil, timeLimit: 420, restTime: 900)])
+        setMeters([MeterConf(name: "s", actionLimit: nil, timeLimit: 60, restTime: 90), MeterConf(name: "m", actionLimit: nil, timeLimit: 600, restTime: 900)])
     }
 
-    init(clock: (() -> Double), makeFile: ((path: String?, mode: String, errorLog: ErrorLog) -> File), root: String?, errorLog: ErrorLog) {
+    init(clock: (() -> Double), makeFile: ((path: String?, mode: String, errorLog: ErrorLog) -> File), root: String, errorLog: ErrorLog) {
         self.clock = clock
         self.errorLog = errorLog
-        let s = NSUUID().UUIDString
-        id = s.substringFromIndex(advance(s.endIndex, -12))
-        var statePath: String?
-        if root != nil {
-            statePath = "\(root!)/state/\(id).txt"
+        var done = false
+        stopDir = "\(root)/stop"
+        let runDir = "\(root)/run"
+        let states = listDir(stopDir, errorLog)
+        if states.count > 0 {
+            state = states[0]
+            if state.move(runDir) {
+                if loadState() {
+                    done = true
+                }
+                else {
+                    state.move(stopDir)
+                }
+            }
         }
-        state = makeFile(path: statePath, mode: "w", errorLog: errorLog)
+        if done {
+            state = states[0]
+        }
+        else {
+            let s = NSUUID().UUIDString
+            let id = s.substringFromIndex(advance(s.endIndex, -12))
+            var statePath = "\(runDir)/\(id).txt"
+            state = makeFile(path: statePath, mode: "w", errorLog: errorLog)
+        }
         configure()
         expire()
     }
@@ -320,9 +436,18 @@ class App {
 
     func act(a: Action) {
         let now = clock()
-        let x = cost(a)
+        var x = cost(a)
         if !has(x) {
             return
+        }
+        if isResting(now) {
+            let totalCost = activationCost + x
+            if totalCost <= activationLimit {
+                activationCost = totalCost
+                return
+            }
+            x = totalCost
+            activationCost = 0
         }
         lastActed = now
         updated = true
@@ -348,9 +473,13 @@ class App {
         fadeUntil = now + Double(fadeTime)
     }
     
+    func isResting(now: Double) -> Bool {
+        return now - lastActed > restDelay
+    }
+    
     func tick() -> (ticking: Bool, statusString: NSAttributedString) {
         let now = clock()
-        let resting = now - lastActed > restDelay
+        let resting = isResting(now)
         let assumedLastActed = resting ? lastActed : now
         let errorStatusStrings = errorLog.count > 0 ? [red("\(errorLog.count)")] : []
         
@@ -395,6 +524,11 @@ class App {
         m.firstActed = nil
         updated = true
     }
+    
+    func terminate() {
+        tick()
+        state.move(stopDir)
+    }
 }
 
 @NSApplicationMain
@@ -402,15 +536,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     var item: NSStatusItem?
     var app: App?
-    var timer: NSTimer?
+    var tickTimer: NSTimer?
     
     func act(e: NSEvent!) {
         if app == nil {
             return
         }
         app!.act(makeAction(e))
-        if timer == nil {
-            timer = NSTimer.scheduledTimerWithTimeInterval(
+        if tickTimer == nil {
+            tickTimer = NSTimer.scheduledTimerWithTimeInterval(
                 1.0, target: self, selector: "tick", userInfo: nil, repeats: true)
         }
     }
@@ -421,10 +555,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let r = app!.tick()
         item!.button!.attributedTitle = r.statusString
-        if timer != nil && !r.ticking {
-            timer!.invalidate()
-            timer = nil
+        if tickTimer != nil && !r.ticking {
+            tickTimer!.invalidate()
+            tickTimer = nil
         }
+    }
+    
+    func expire() {
+        app?.expire()
+    }
+    
+    func createExpireTimer() -> NSTimer {
+        return NSTimer.scheduledTimerWithTimeInterval(
+            86400.0, target: self, selector: "expire", userInfo: nil, repeats: true)
     }
 
     func applicationDidFinishLaunching(aNotification: NSNotification) {
@@ -436,13 +579,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         
-        let errorLog = ErrorLog()
-        var root : String? = "~/Library/Application Support/Ergometer".stringByStandardizingPath
-        var e : NSError?
-        if !NSFileManager.defaultManager().createDirectoryAtPath(root!, withIntermediateDirectories: true, attributes: nil, error: &e) {
-            root = nil
-            errorLog.warn("Couldn't create <\(root)>" + (e != nil ? ": " + e!.localizedDescription : ""))
+        var root = "~/Library/Application Support/Ergometer".stringByStandardizingPath
+        let errorLog = ErrorLog(root: root)
+        
+        // create daily expire timer
+        let calendar = NSCalendar.currentCalendar()
+        let flags: NSCalendarUnit = .DayCalendarUnit | .MonthCalendarUnit | .YearCalendarUnit | .HourCalendarUnit
+        var date = NSDate()
+        let components = calendar.components(flags, fromDate: date)
+        let expireHour = 4
+        if components.hour >= expireHour {
+            date = calendar.dateByAddingUnit(.DayCalendarUnit, value: 1, toDate: date, options: NSCalendarOptions())!
         }
+        date = calendar.dateBySettingHour(expireHour, minute: 0, second: 0, ofDate: date, options: NSCalendarOptions())!
+        
+        var expireOffset = date.timeIntervalSince1970
+        NSTimer.scheduledTimerWithTimeInterval(
+            expireOffset, target: self, selector: "createExpireTimer", userInfo: nil, repeats: false)
         
         app = App(clock: systemClock, makeFile: makeSystemFile, root: root, errorLog: errorLog)
         tick()
@@ -456,6 +609,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(aNotification: NSNotification) {
-        tick()
+        app?.terminate()
     }
 }
