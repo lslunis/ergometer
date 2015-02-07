@@ -179,10 +179,11 @@ class Meter {
     let app: App
     let name: String
     var actionCost = 0.0
-    var actionLimit: Double?
+    var timeCosts = [String:Double]()
     var firstActed: Double?
-    var timeLimit: Double?
-    var restTime: Double = 0
+    var actionLimit: Double?
+    var timeLimits = [String:Double]()
+    var restTime = 0.0
     
     init(app: App, name: String) {
         self.app = app
@@ -191,9 +192,7 @@ class Meter {
     
     func add(x: Double, now: Double) {
         actionCost += x
-        if has(timeLimit) {
-            firstActed = firstActed ?? now
-        }
+        firstActed = firstActed ?? now
     }
     
     func rest(lastActed: Double, now: Double) -> Double {
@@ -206,16 +205,24 @@ class Meter {
         return restLeft
     }
     
-    func status(lastActed: Double) -> Double {
-        let timed = has(timeLimit)
-        let activeElapsed = firstActed != nil ? lastActed - firstActed! : 0
-        if has(actionLimit) {
-            return actionLimit! - actionCost
+    func currentTimeCost(lastActed: Double) -> Double {
+        return firstActed != nil ? lastActed - firstActed! : 0
+    }
+    
+    func stat (inout statuses: [Double], cost: Double?, limit: Double?) {
+        if let n = limit {
+            let k = cost ?? 0
+            statuses.append(n == 0 ? k : n - k)
         }
-        if timed {
-            return timeLimit! - activeElapsed
+    }
+
+    func status(namedMeters: [String:Meter], lastActed: Double) -> [Double] {
+        var statuses = [Double]()
+        stat(&statuses, cost: actionCost, limit: actionLimit)
+        for (name, limit) in timeLimits {
+            stat(&statuses, cost: (timeCosts[name] ?? 0) + (namedMeters[name]?.currentTimeCost(lastActed) ?? 0), limit: limit)
         }
-        return actionCost
+        return statuses
     }
     
     func expire() {
@@ -234,19 +241,19 @@ class MeterConf: MeterData {
     
     let name: String
     let actionLimit: Double?
-    let timeLimit: Double?
+    let timeLimits: [String:Double]?
     let restTime: Double?
     
-    init(name: String, actionLimit: Double?, timeLimit: Double?, restTime: Double?) {
+    init(name: String, actionLimit: Double?, timeLimits: [String:Double]?, restTime: Double?) {
         self.name = name
         self.actionLimit = actionLimit
-        self.timeLimit = timeLimit
+        self.timeLimits = timeLimits
         self.restTime = restTime
     }
     
     func copyTo(m: Meter) {
         m.actionLimit = actionLimit
-        m.timeLimit = timeLimit
+        m.timeLimits = timeLimits ?? [String:Double]()
         m.restTime = restTime ?? 0
     }
 }
@@ -256,23 +263,32 @@ class MeterState: MeterData {
     let name: String
     let actionCost: Double
     let firstActed: Double?
+    let timeCosts: [String:Double]
     
-    init(name: String, actionCost: Double, firstActed: Double?) {
+    init(name: String, actionCost: Double, firstActed: Double?, timeCosts: [String:Double]) {
         self.name = name
         self.actionCost = actionCost
         self.firstActed = firstActed
+        self.timeCosts = timeCosts
     }
     
     func copyTo(m: Meter) {
         m.actionCost = actionCost
         m.firstActed = firstActed
+        m.timeCosts = timeCosts
     }
 }
 
 func parseMeterState(j: JSON) -> MeterState? {
     if let n = j["name"].string {
         if let ac = j["actionCost"].double {
-            return MeterState(name: n, actionCost: ac, firstActed: j["firstActed"].double)
+            if let tc = j["timeCosts"].dictionary {
+                var timeCosts = [String:Double]()
+                for (key: String, subJson: JSON) in tc {
+                    timeCosts[key] = subJson.doubleValue
+                }
+                return MeterState(name: n, actionCost: ac, firstActed: j["firstActed"].double, timeCosts: timeCosts)
+            }
         }
     }
     return nil
@@ -352,7 +368,10 @@ class App {
         if updated {
             let m = ",".join(map(meters) {
                 let firstActed = $0.firstActed != nil ? "\($0.firstActed!)" : "null"
-                return "{\"name\":\"\($0.name)\",\"actionCost\":\($0.actionCost),\"firstActed\":\(firstActed)}"
+                let timeCosts = ",".join(map($0.timeCosts) {
+                    "\"\($0.0)\":\($0.1)"
+                })
+                return "{\"name\":\"\($0.name)\",\"actionCost\":\($0.actionCost),\"firstActed\":\(firstActed),\"timeCosts\":{\(timeCosts)}}"
                 })
             let data = "{\"meters\":[\(m)],\"lastActed\":\(lastActed)}"
             updated = !state.write(data)
@@ -371,7 +390,7 @@ class App {
     }
 
     func configure() {
-        setMeters([MeterConf(name: "s", actionLimit: nil, timeLimit: 60, restTime: 90), MeterConf(name: "m", actionLimit: nil, timeLimit: 600, restTime: 900)])
+        setMeters([MeterConf(name: "s", actionLimit: nil, timeLimits: ["s": 60], restTime: 90), MeterConf(name: "m", actionLimit: nil, timeLimits: ["s": 300], restTime: 900), MeterConf(name: "d", actionLimit: 0, timeLimits: ["s": 0, "m": 0], restTime: nil)])
     }
 
     init(clock: (() -> Double), makeFile: ((path: String?, mode: String, errorLog: ErrorLog) -> File), root: String, errorLog: ErrorLog) {
@@ -402,7 +421,6 @@ class App {
             state = makeFile(path: statePath, mode: "w", errorLog: errorLog)
         }
         configure()
-        expire()
     }
     
     func meta(i: Int) -> Double {
@@ -481,23 +499,32 @@ class App {
         let now = clock()
         let resting = isResting(now)
         let assumedLastActed = resting ? lastActed : now
-        let errorStatusStrings = errorLog.count > 0 ? [red("\(errorLog.count)")] : []
+        let errorStatusStringGroup = errorLog.count > 0 ? [red("\(errorLog.count)")] : []
         
         let restStatuses = map(meters) { $0.rest(assumedLastActed, now: now) }.filter { $0 > 0 }
         let ticking = !restStatuses.isEmpty
-        let restStatusStrings = resting && ticking ? [redUnlessPositive(minElement(restStatuses))] : []
+        let restStatusStringGroup = resting && ticking ? [redUnlessPositive(minElement(restStatuses))] : []
         
-        let meterStatuses = map(meters) { $0.status(assumedLastActed) }
-        let shouldStop = any(meterStatuses.map { $0 < 0 })
-        let meterStatusStrings = meterStatuses.map(redUnlessPositive)
+        var namedMeters = [String:Meter]()
+        for m in meters {
+            namedMeters[m.name] = m
+        }
+        let meterStatusGroups = map(meters) { $0.status(namedMeters, lastActed: assumedLastActed) }
+        let shouldStop = any(meterStatusGroups.map { any($0.map { $0 < 0 }) })
+        let meterStatusStringGroups = meterStatusGroups.map({ $0.map(redUnlessPositive) })
         
         let statusBuffer = NSMutableAttributedString()
-        let statusStrings = errorStatusStrings + restStatusStrings + meterStatusStrings
-        for (i, s) in enumerate(statusStrings) {
-            if i > 0 {
-                statusBuffer.appendAttributedString(NSAttributedString(string: "  "))
+        let statusStringGroups = ([errorStatusStringGroup] + [restStatusStringGroup] + meterStatusStringGroups).filter { !$0.isEmpty }
+        for (groupIndex, statusStringGroup) in enumerate(statusStringGroups) {
+            if groupIndex > 0 {
+                statusBuffer.appendAttributedString(NSAttributedString(string: "  ·  "))
             }
-            statusBuffer.appendAttributedString(s)
+            for (i, s) in enumerate(statusStringGroup) {
+                if i > 0 {
+                    statusBuffer.appendAttributedString(NSAttributedString(string: "  "))
+                }
+                statusBuffer.appendAttributedString(s)
+            }
         }
         
         if shouldStop && !resting {
@@ -519,9 +546,16 @@ class App {
         map(meters) { $0.expire() }
     }
     
-    func reset(m: Meter) {
-        m.actionCost = 0
-        m.firstActed = nil
+    func reset(source: Meter) {
+        let n = source.name
+        let t = source.currentTimeCost(lastActed)
+        for m in meters {
+            let tt = m.timeCosts[n] ?? 0
+            m.timeCosts[n] = tt + t
+        }
+        source.actionCost = 0
+        source.firstActed = nil
+        source.timeCosts = [:]
         updated = true
     }
     
@@ -534,6 +568,8 @@ class App {
 @NSApplicationMain
 class AppDelegate: NSObject, NSApplicationDelegate {
     
+    var root: String?
+    var errorLog: ErrorLog?
     var item: NSStatusItem?
     var app: App?
     var tickTimer: NSTimer?
@@ -562,15 +598,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     func expire() {
+        errorLog?.info("expire")
         app?.expire()
     }
     
     func createExpireTimer() -> NSTimer {
+        errorLog?.info("createExpireTimer")
+        expire()
         return NSTimer.scheduledTimerWithTimeInterval(
             86400.0, target: self, selector: "expire", userInfo: nil, repeats: true)
     }
 
     func applicationDidFinishLaunching(aNotification: NSNotification) {
+        root = "~/Library/Application Support/Ergometer".stringByStandardizingPath
+        errorLog = ErrorLog(root: root)
+
         item = NSStatusBar.systemStatusBar().statusItemWithLength(/* NSVariableStatusItemLength */ -1)
         let prompt: String = kAXTrustedCheckOptionPrompt.takeUnretainedValue()
         let trusted = AXIsProcessTrustedWithOptions([prompt: true]) != 0
@@ -579,25 +621,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         
-        var root = "~/Library/Application Support/Ergometer".stringByStandardizingPath
-        let errorLog = ErrorLog(root: root)
-        
         // create daily expire timer
         let calendar = NSCalendar.currentCalendar()
         let flags: NSCalendarUnit = .DayCalendarUnit | .MonthCalendarUnit | .YearCalendarUnit | .HourCalendarUnit
-        var date = NSDate()
-        let components = calendar.components(flags, fromDate: date)
+        let nowDate = NSDate()
+        let components = calendar.components(flags, fromDate: nowDate)
         let expireHour = 4
+        var expireDate = nowDate
         if components.hour >= expireHour {
-            date = calendar.dateByAddingUnit(.DayCalendarUnit, value: 1, toDate: date, options: NSCalendarOptions())!
+            expireDate = calendar.dateByAddingUnit(.DayCalendarUnit, value: 1, toDate: expireDate, options: NSCalendarOptions())!
         }
-        date = calendar.dateBySettingHour(expireHour, minute: 0, second: 0, ofDate: date, options: NSCalendarOptions())!
+        expireDate = calendar.dateBySettingHour(expireHour, minute: 0, second: 0, ofDate: expireDate, options: NSCalendarOptions())!
         
-        var expireOffset = date.timeIntervalSince1970
+        let expireOffset = expireDate.timeIntervalSince1970 - nowDate.timeIntervalSince1970
+        errorLog?.info("expire in \(expireOffset)s")
         NSTimer.scheduledTimerWithTimeInterval(
             expireOffset, target: self, selector: "createExpireTimer", userInfo: nil, repeats: false)
         
-        app = App(clock: systemClock, makeFile: makeSystemFile, root: root, errorLog: errorLog)
+        app = App(clock: systemClock, makeFile: makeSystemFile, root: root!, errorLog: errorLog!)
         tick()
         let mask : NSEventMask =
             .KeyDownMask |
