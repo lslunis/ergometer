@@ -169,9 +169,9 @@ func red(s: String) -> NSAttributedString {
     return NSAttributedString(string: s, attributes: style)
 }
 
-func redUnlessPositive(x: Double) -> NSAttributedString {
+func redIfNegative(x: Double) -> NSAttributedString {
     let s = "\(Int(round(x)))"
-    return x > 0 ? NSAttributedString(string: s) : red(s)
+    return x < 0 ? red(s) : NSAttributedString(string: s)
 }
 
 class Meter {
@@ -241,10 +241,10 @@ class MeterConf: MeterData {
     
     let name: String
     let actionLimit: Double?
-    let timeLimits: [String:Double]?
+    let timeLimits: [String:Double]
     let restTime: Double?
     
-    init(name: String, actionLimit: Double?, timeLimits: [String:Double]?, restTime: Double?) {
+    init(name: String, actionLimit: Double?, timeLimits: [String:Double], restTime: Double?) {
         self.name = name
         self.actionLimit = actionLimit
         self.timeLimits = timeLimits
@@ -253,9 +253,20 @@ class MeterConf: MeterData {
     
     func copyTo(m: Meter) {
         m.actionLimit = actionLimit
-        m.timeLimits = timeLimits ?? [String:Double]()
+        m.timeLimits = timeLimits
         m.restTime = restTime ?? 0
     }
+}
+
+func parseMeterConf(j: JSON) -> MeterConf? {
+    if let n = j["name"].string {
+        var timeLimits = [String:Double]()
+        for (key: String, subJson: JSON) in j["timeLimits"].dictionary ?? [String:JSON]() {
+            timeLimits[key] = subJson.doubleValue
+        }
+        return MeterConf(name: n, actionLimit: j["actionLimit"].double, timeLimits: timeLimits, restTime: j["restTime"].double)
+    }
+    return nil
 }
 
 class MeterState: MeterData {
@@ -312,6 +323,7 @@ class App {
     let errorLog: ErrorLog
     let stopDir: String
     let state: File
+    let conf: File
     var metaDowns = [Int]()
     var fadeUntil = 0.0
     var mayGo = false
@@ -347,18 +359,28 @@ class App {
         meters = newList.map { olds[$0.name]! }
     }
     
-    func parseMeters(y: JSON, parseMeter: ((JSON) -> MeterData?)) -> [MeterData]? {
+    func parseMeters(y: JSON, isState: Bool) -> [MeterData]? {
         let yms = y["meters"].array
         if yms == nil {
             return nil
         }
         var meters = [MeterData]()
         for ym in yms! {
-            if let m = parseMeterState(ym) {
-                meters.append(m)
+            if isState {
+                if let m = parseMeterState(ym) {
+                    meters.append(m)
+                }
+                else {
+                    return nil
+                }
             }
             else {
-                return nil
+                if let m = parseMeterConf(ym) {
+                    meters.append(m)
+                }
+                else {
+                    return nil
+                }
             }
         }
         return meters
@@ -380,7 +402,7 @@ class App {
 
     func loadState() -> Bool {
         let y = state.json()
-        let m = parseMeters(y, parseMeter: parseMeterState)
+        let m = parseMeters(y, isState: true)
         let r = m != nil
         if r {
             setMeters(m!)
@@ -390,12 +412,16 @@ class App {
     }
 
     func configure() {
-        setMeters([MeterConf(name: "s", actionLimit: nil, timeLimits: ["s": 60], restTime: 90), MeterConf(name: "m", actionLimit: nil, timeLimits: ["s": 300], restTime: 900), MeterConf(name: "d", actionLimit: 0, timeLimits: ["s": 0, "m": 0], restTime: nil)])
+        let j = conf.json()
+        if let m = parseMeters(j, isState: false) {
+            setMeters(m)
+        }
     }
 
     init(clock: (() -> Double), makeFile: ((path: String?, mode: String, errorLog: ErrorLog) -> File), root: String, errorLog: ErrorLog) {
         self.clock = clock
         self.errorLog = errorLog
+        conf = makeFile(path: "\(root)/conf.json", mode: "w", errorLog: errorLog)
         var done = false
         stopDir = "\(root)/stop"
         let runDir = "\(root)/run"
@@ -420,7 +446,6 @@ class App {
             var statePath = "\(runDir)/\(id).txt"
             state = makeFile(path: statePath, mode: "w", errorLog: errorLog)
         }
-        configure()
     }
     
     func meta(i: Int) -> Double {
@@ -503,7 +528,7 @@ class App {
         
         let restStatuses = map(meters) { $0.rest(assumedLastActed, now: now) }.filter { $0 > 0 }
         let ticking = !restStatuses.isEmpty
-        let restStatusStringGroup = resting && ticking ? [redUnlessPositive(minElement(restStatuses))] : []
+        let restStatusStringGroup = resting && ticking ? [redIfNegative(minElement(restStatuses))] : []
         
         var namedMeters = [String:Meter]()
         for m in meters {
@@ -511,7 +536,7 @@ class App {
         }
         let meterStatusGroups = map(meters) { $0.status(namedMeters, lastActed: assumedLastActed) }
         let shouldStop = any(meterStatusGroups.map { any($0.map { $0 < 0 }) })
-        let meterStatusStringGroups = meterStatusGroups.map({ $0.map(redUnlessPositive) })
+        let meterStatusStringGroups = meterStatusGroups.map({ $0.map(redIfNegative) })
         
         let statusBuffer = NSMutableAttributedString()
         let statusStringGroups = ([errorStatusStringGroup] + [restStatusStringGroup] + meterStatusStringGroups).filter { !$0.isEmpty }
@@ -585,6 +610,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     
+    func configure() {
+        app?.configure()
+    }
+    
     func tick() {
         if app == nil {
             return
@@ -598,12 +627,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     func expire() {
-        errorLog?.info("expire")
         app?.expire()
     }
     
     func createExpireTimer() -> NSTimer {
-        errorLog?.info("createExpireTimer")
         expire()
         return NSTimer.scheduledTimerWithTimeInterval(
             86400.0, target: self, selector: "expire", userInfo: nil, repeats: true)
@@ -634,11 +661,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         expireDate = calendar.dateBySettingHour(expireHour, minute: 0, second: 0, ofDate: expireDate, options: NSCalendarOptions())!
         
         let expireOffset = expireDate.timeIntervalSince1970 - nowDate.timeIntervalSince1970
-        errorLog?.info("expire in \(expireOffset)s")
         NSTimer.scheduledTimerWithTimeInterval(
             expireOffset, target: self, selector: "createExpireTimer", userInfo: nil, repeats: false)
         
         app = App(clock: systemClock, makeFile: makeSystemFile, root: root!, errorLog: errorLog!)
+        configure()
         tick()
         let mask : NSEventMask =
             .KeyDownMask |
