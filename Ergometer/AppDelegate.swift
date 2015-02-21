@@ -309,6 +309,7 @@ class App {
 
     // Serialized state
     var lastActed = 0.0
+    var lastExpired = 0.0
     var activationCost = 0.0
     var meters = [Meter]()
     
@@ -316,7 +317,7 @@ class App {
     var fadeTime : Float = 3.0
     var fadeValue : CGDisplayBlendFraction = 0.8
     var stopFade: (t: Float, a: Float, r: Float, g: Float, b: Float) = (t: 5, a: 0.9, r: 1, g: 0, b: 0)
-    var goFade: (t: Float, a: Float, r: Float, g: Float, b: Float) = (t: 1, a: 0.1, r: 0, g: 0, b: 1)
+    var goFade: (t: Float, a: Float, r: Float, g: Float, b: Float) = (t: 1, a: 0.2, r: 0, g: 0, b: 1)
     let restDelay = 5.0
     let activationLimit = 10.0
     let activationDelay = 30.0
@@ -398,7 +399,7 @@ class App {
                 })
                 return "{\"name\":\"\($0.name)\",\"actionCost\":\($0.actionCost),\"firstActed\":\(firstActed),\"timeCosts\":{\(timeCosts)}}"
                 })
-            let data = "{\"meters\":[\(m)],\"lastActed\":\(lastActed)}"
+            let data = "{\"meters\":[\(m)],\"lastActed\":\(lastActed),\"lastExpired\":\(lastExpired)}"
             updated = !state.write(data)
         }
     }
@@ -411,6 +412,7 @@ class App {
             setMeters(m!)
         }
         lastActed = y["lastActed"].double!
+        lastExpired = y["lastExpired"].double!
         return r
     }
 
@@ -449,6 +451,7 @@ class App {
             var statePath = "\(runDir)/\(id).txt"
             state = makeFile(path: statePath, mode: "w", errorLog: errorLog)
         }
+        configure()
     }
     
     func meta(i: Int) -> Double {
@@ -518,15 +521,15 @@ class App {
         fadeUntil = now + Double(f.t)
     }
     
-    func tick() -> (ticking: Bool, statusString: NSAttributedString) {
+    func tick() -> NSAttributedString {
         let now = clock()
         let resting = now - lastActed > restDelay
         let assumedLastActed = resting ? lastActed : now
         let errorStatusStringGroup = errorLog.count > 0 ? [red("\(errorLog.count)")] : []
         
+        expire(now)
         let restStatuses = map(meters) { $0.rest(assumedLastActed, now: now) }.filter { $0 > 0 }
-        let ticking = !restStatuses.isEmpty
-        let restStatusStringGroup = resting && ticking ? [redIfNegative(minElement(restStatuses))] : []
+        let restStatusStringGroup = resting && !restStatuses.isEmpty ? [redIfNegative(minElement(restStatuses))] : []
         
         var namedMeters = [String:Meter]()
         for m in meters {
@@ -562,11 +565,25 @@ class App {
         
         storeState()
 
-        return (ticking, statusBuffer)
+        return statusBuffer
     }
     
-    func expire() {
-        map(meters) { $0.expire() }
+    func expire(now: Double) {
+        let calendar = NSCalendar.currentCalendar()
+        let flags: NSCalendarUnit = .DayCalendarUnit | .MonthCalendarUnit | .YearCalendarUnit | .HourCalendarUnit
+        var expireDate = NSDate(timeIntervalSince1970: now)
+        let components = calendar.components(flags, fromDate: expireDate)
+        let expireHour = 4
+        if components.hour < expireHour {
+            expireDate = calendar.dateByAddingUnit(.DayCalendarUnit, value: -1, toDate: expireDate, options: NSCalendarOptions())!
+        }
+        expireDate = calendar.dateBySettingHour(expireHour, minute: 0, second: 0, ofDate: expireDate, options: NSCalendarOptions())!
+        
+        let lastExpirable = expireDate.timeIntervalSince1970
+        if lastExpired < lastExpirable {
+            lastExpired = now
+            map(meters) { $0.expire() }
+        }
     }
     
     func reset(source: Meter) {
@@ -591,53 +608,20 @@ class App {
 @NSApplicationMain
 class AppDelegate: NSObject, NSApplicationDelegate {
     
-    var root: String?
-    var errorLog: ErrorLog?
     var item: NSStatusItem?
     var app: App?
-    var tickTimer: NSTimer?
     
     func act(e: NSEvent!) {
-        if app == nil {
-            return
-        }
-        app!.act(makeAction(e))
-        if tickTimer == nil {
-            tickTimer = NSTimer.scheduledTimerWithTimeInterval(
-                1.0, target: self, selector: "tick", userInfo: nil, repeats: true)
-        }
-    }
-    
-    func configure() {
-        app?.configure()
+        app?.act(makeAction(e))
     }
     
     func tick() {
-        if app == nil {
-            return
-        }
-        let r = app!.tick()
-        item!.button!.attributedTitle = r.statusString
-        if tickTimer != nil && !r.ticking {
-            tickTimer!.invalidate()
-            tickTimer = nil
+        if let s = app?.tick() {
+            item!.button!.attributedTitle = s
         }
     }
     
-    func expire() {
-        app?.expire()
-    }
-    
-    func createExpireTimer() -> NSTimer {
-        expire()
-        return NSTimer.scheduledTimerWithTimeInterval(
-            86400.0, target: self, selector: "expire", userInfo: nil, repeats: true)
-    }
-
     func applicationDidFinishLaunching(aNotification: NSNotification) {
-        root = "~/Library/Application Support/Ergometer".stringByStandardizingPath
-        errorLog = ErrorLog(root: root)
-
         item = NSStatusBar.systemStatusBar().statusItemWithLength(/* NSVariableStatusItemLength */ -1)
         let prompt: String = kAXTrustedCheckOptionPrompt.takeUnretainedValue()
         let trusted = AXIsProcessTrustedWithOptions([prompt: true]) != 0
@@ -646,25 +630,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         
-        // create daily expire timer
-        let calendar = NSCalendar.currentCalendar()
-        let flags: NSCalendarUnit = .DayCalendarUnit | .MonthCalendarUnit | .YearCalendarUnit | .HourCalendarUnit
-        let nowDate = NSDate()
-        let components = calendar.components(flags, fromDate: nowDate)
-        let expireHour = 4
-        var expireDate = nowDate
-        if components.hour >= expireHour {
-            expireDate = calendar.dateByAddingUnit(.DayCalendarUnit, value: 1, toDate: expireDate, options: NSCalendarOptions())!
-        }
-        expireDate = calendar.dateBySettingHour(expireHour, minute: 0, second: 0, ofDate: expireDate, options: NSCalendarOptions())!
-        
-        let expireOffset = expireDate.timeIntervalSince1970 - nowDate.timeIntervalSince1970
-        NSTimer.scheduledTimerWithTimeInterval(
-            expireOffset, target: self, selector: "createExpireTimer", userInfo: nil, repeats: false)
-        
-        app = App(clock: systemClock, makeFile: makeSystemFile, root: root!, errorLog: errorLog!)
-        configure()
-        tick()
+        let root = "~/Library/Application Support/Ergometer".stringByStandardizingPath
+        let errorLog = ErrorLog(root: root)
+        app = App(clock: systemClock, makeFile: makeSystemFile, root: root, errorLog: errorLog)
+        NSTimer.scheduledTimerWithTimeInterval(1, target: self, selector: "tick", userInfo: nil, repeats: true)
         let mask : NSEventMask =
             .KeyDownMask |
             .FlagsChangedMask |
