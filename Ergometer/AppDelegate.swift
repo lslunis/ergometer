@@ -315,8 +315,11 @@ class App {
     // Potential Config
     var fadeTime : Float = 3.0
     var fadeValue : CGDisplayBlendFraction = 0.8
+    var stopFade: (t: Float, a: Float, r: Float, g: Float, b: Float) = (t: 5, a: 0.9, r: 1, g: 0, b: 0)
+    var goFade: (t: Float, a: Float, r: Float, g: Float, b: Float) = (t: 1, a: 0.1, r: 0, g: 0, b: 1)
     let restDelay = 5.0
     let activationLimit = 10.0
+    let activationDelay = 30.0
     
     // Volatile State
     let clock: (() -> Double)
@@ -483,7 +486,7 @@ class App {
         if !has(x) {
             return
         }
-        if isResting(now) {
+        if now - lastActed > activationDelay {
             let totalCost = activationCost + x
             if totalCost <= activationLimit {
                 activationCost = totalCost
@@ -501,28 +504,23 @@ class App {
         if now < fadeUntil {
             return
         }
+        let f = go ? goFade : stopFade
         let success = CGError(kCGErrorSuccess.value)
         var token = CGDisplayFadeReservationToken(kCGDisplayFadeReservationInvalidToken)
-        var e = CGAcquireDisplayFadeReservation(fadeTime, &token)
+        var e = CGAcquireDisplayFadeReservation(f.t, &token)
         if e != success {
             return
         }
-        let red: Float = go ? 0 : 1
-        let blue: Float = go ? 1 : 0
-        e = CGDisplayFade(token, 0, CGDisplayBlendFraction(kCGDisplayBlendNormal), fadeValue, red, 0, blue, 0)
+        e = CGDisplayFade(token, 0, 0, f.a, f.r, f.g, f.b, 0)
         if e != success {
             errorLog.warn("CGError returned \(e.value)")
         }
-        fadeUntil = now + Double(fadeTime)
-    }
-    
-    func isResting(now: Double) -> Bool {
-        return now - lastActed > restDelay
+        fadeUntil = now + Double(f.t)
     }
     
     func tick() -> (ticking: Bool, statusString: NSAttributedString) {
         let now = clock()
-        let resting = isResting(now)
+        let resting = now - lastActed > restDelay
         let assumedLastActed = resting ? lastActed : now
         let errorStatusStringGroup = errorLog.count > 0 ? [red("\(errorLog.count)")] : []
         
