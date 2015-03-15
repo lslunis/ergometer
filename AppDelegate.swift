@@ -109,12 +109,13 @@ func formatDate(date: NSDate) -> String {
 class ErrorLog {
     
     var count = 0
-    let root: String?
     let logFile: File?
     
     init(root: String?) {
         if root != nil {
             logFile = SystemFile(path: "\(root!)/error.log", mode: "a", errorLog: ErrorLog(root: nil))
+        } else {
+            logFile = nil
         }
     }
     
@@ -140,8 +141,8 @@ class ErrorLog {
     }
 }
 
-enum Action {
-    case Key(Int), Meta(Int), Click, Ignored
+enum Action: Int {
+    case Key(Int) = 0, Meta(Int), Click, Ignored
 }
 
 func makeAction(e: NSEvent!) -> Action {
@@ -160,18 +161,82 @@ func makeAction(e: NSEvent!) -> Action {
     }
 }
 
+func min(x: Double?, y: Double?) -> Double? {
+    return x != nil ? y != nil ? min(x!, y!) : x : y
+}
+
+func min(xs: [Double?]) -> Double? {
+    return xs.reduce(nil, combine: min)
+}
+
+typealias Status = (a: Double?, t: Double?)
+
+func min(xs: [Status]) -> Status {
+    return (a: min(xs.map { $0.a }), t: min(xs.map { $0.t }))
+}
+
 func has(x: Double?) -> Bool {
     return (x ?? 0) != 0
 }
 
-func red(s: String) -> NSAttributedString {
-    let style = [NSForegroundColorAttributeName: NSColor.redColor()]
+let spacer = NSAttributedString(string: "  ")
+
+func colored(s: String, color: NSColor) -> NSAttributedString {
+    let style = [NSForegroundColorAttributeName: color]
     return NSAttributedString(string: s, attributes: style)
+}
+
+func red(s: String) -> NSAttributedString {
+    return colored(s, NSColor.redColor())
 }
 
 func redIfNegative(x: Double) -> NSAttributedString {
     let s = "\(Int(round(x)))"
     return x < 0 ? red(s) : NSAttributedString(string: s)
+}
+
+func formatTime(t: Double) -> String {
+    var parts = [String]()
+    var q = Int(round(abs(t)))
+    while true {
+        let r = q % 60
+        let s = String(r)
+        q /= 60
+        let done = q == 0 && !parts.isEmpty
+        let pre = !done && count(s.utf16) == 1 ? "0" : ""
+        parts.insert(pre + s, atIndex: 0)
+        if done {
+            break
+        }
+    }
+    let sign = t < 0 ? "-" : ""
+    return sign + ":".join(parts)
+}
+
+func grayTime(t: Double) -> NSAttributedString {
+    return colored(formatTime(t), NSColor.lightGrayColor())
+}
+
+func redTimeIfNegative(t: Double) -> NSAttributedString {
+    let s = formatTime(t)
+    return t < 0 ? red(s) : NSAttributedString(string: s)
+}
+
+func formatStatus(s: Status) -> [NSAttributedString] {
+    if s.a == nil && s.t == nil {
+        return []
+    }
+    var buffer = NSMutableAttributedString()
+    if let a = s.a {
+        buffer.appendAttributedString(redIfNegative(a))
+    }
+    if s.a != nil && s.t != nil {
+        buffer.appendAttributedString(spacer)
+    }
+    if let t = s.t {
+        buffer.appendAttributedString(redTimeIfNegative(t))
+    }
+    return [buffer]
 }
 
 class Meter {
@@ -196,33 +261,31 @@ class Meter {
     }
     
     func rest(lastActed: Double, now: Double) -> Double {
-        let restLeft = lastActed + restTime - now
-        let restNeeded = actionCost != 0 || firstActed != nil
-        if has(restTime) && restLeft <= 0 && restNeeded {
-            app.mayGo = true
+        let neededRest = lastActed + restTime - now
+        if has(restTime) && neededRest <= 0 && firstActed != nil {
             app.reset(self)
         }
-        return restLeft
+        return neededRest
     }
     
     func currentTimeCost(lastActed: Double) -> Double {
         return firstActed != nil ? lastActed - firstActed! : 0
     }
     
-    func stat (inout statuses: [Double], cost: Double?, limit: Double?) {
+    func stat(cost: Double?, limit: Double?) -> Double? {
         if let n = limit {
             let k = cost ?? 0
-            statuses.append(n == 0 ? k : n - k)
+            return n - k
         }
+        return nil
     }
 
-    func status(namedMeters: [String:Meter], lastActed: Double) -> [Double] {
-        var statuses = [Double]()
-        stat(&statuses, cost: actionCost, limit: actionLimit)
-        for (name, limit) in timeLimits {
-            stat(&statuses, cost: (timeCosts[name] ?? 0) + (namedMeters[name]?.currentTimeCost(lastActed) ?? 0), limit: limit)
-        }
-        return statuses
+    func status(namedMeters: [String:Meter], now: Double) -> Status {
+        let a = stat(actionCost, limit: actionLimit)
+        let t = min(map(timeLimits) { (name, limit) in
+            self.stat((self.timeCosts[name] ?? 0) + (namedMeters[name]?.currentTimeCost(now) ?? 0), limit: limit)
+        })
+        return (a, t)
     }
     
     func expire() {
@@ -318,7 +381,7 @@ class App {
     var fadeValue : CGDisplayBlendFraction = 0.8
     var stopFade: (t: Float, a: Float, r: Float, g: Float, b: Float) = (t: 5, a: 0.9, r: 1, g: 0, b: 0)
     var goFade: (t: Float, a: Float, r: Float, g: Float, b: Float) = (t: 1, a: 0.2, r: 0, g: 0, b: 1)
-    let restDelay = 5.0
+    let restDelay = 15.0
     let activationLimit = 10.0
     let activationDelay = 30.0
     
@@ -326,12 +389,14 @@ class App {
     let clock: (() -> Double)
     let errorLog: ErrorLog
     let stopDir: String
-    let state: File
+    var state: File
     let conf: File
     var metaDowns = [Int]()
     var fadeUntil = 0.0
-    var mayGo = false
+    var lastExhaustedlyActed = 0.0
+    var lastMinStatus: Status = (a: nil, t: nil)
     var updated = false
+    var record = [[Int]]()
 
     func setMeters(newList: [MeterData]) {
         var olds = [String:Meter]()
@@ -411,8 +476,8 @@ class App {
         if r {
             setMeters(m!)
         }
-        lastActed = y["lastActed"].double!
-        lastExpired = y["lastExpired"].double!
+        lastActed = y["lastActed"].double ?? 0
+        lastExpired = y["lastExpired"].double ?? 0
         return r
     }
 
@@ -482,6 +547,15 @@ class App {
             return 0
         }
     }
+    
+    func log(a: Action) {
+        let group = a.rawValue
+        switch a {
+        case let .Key(i):
+        case let .Meta(i):
+            
+        }
+    }
 
     func act(a: Action) {
         let now = clock()
@@ -524,43 +598,89 @@ class App {
     func tick() -> NSAttributedString {
         let now = clock()
         let resting = now - lastActed > restDelay
-        let assumedLastActed = resting ? lastActed : now
-        let errorStatusStringGroup = errorLog.count > 0 ? [red("\(errorLog.count)")] : []
         
         expire(now)
-        let restStatuses = map(meters) { $0.rest(assumedLastActed, now: now) }.filter { $0 > 0 }
-        let restStatusStringGroup = resting && !restStatuses.isEmpty ? [redIfNegative(minElement(restStatuses))] : []
+        let remainingRests = map(meters) { $0.rest(self.lastActed, now: now) }
         
         var namedMeters = [String:Meter]()
         for m in meters {
             namedMeters[m.name] = m
         }
-        let meterStatusGroups = map(meters) { $0.status(namedMeters, lastActed: assumedLastActed) }
-        let shouldStop = any(meterStatusGroups.map { any($0.map { $0 < 0 }) })
-        let meterStatusStringGroups = meterStatusGroups.map({ $0.map(redIfNegative) })
+        let statuses: [Status] = map(meters) { $0.status(namedMeters, now: now) }
+        let minStatus = min(statuses)
+        var restlessStatuses = [Status]()
+        var indexes = [Int]()
+        for (i, status) in enumerate(statuses) {
+            if !has(meters[i].restTime) {
+                restlessStatuses.append(status)
+            }
+            indexes.append(i)
+        }
+        let restlessStatus = min(restlessStatuses)
+        
+        indexes.sort { (i, j) in remainingRests[i] < remainingRests[j] }
+        
+        let betterStatus = { (x: Status, y: Status) -> Bool in
+            let sa = x.a ?? 0
+            let st = x.t ?? 0
+            return sa > 0 && st > 0 && (sa > (y.a ?? 0) || st > (y.t ?? 0))
+        }
+        
+        var counterfactualStatuses = statuses
+        var neededRest: Double?
+        for i in indexes {
+            let remainingRest = remainingRests[i]
+            if remainingRest <= 0 {
+                continue
+            }
+            let m = meters[i]
+            let a = m.actionLimit
+            var values = [Double?]()
+            for t in m.timeLimits.values {
+                values.append(t)
+            }
+            let t = min(values)
+            
+            counterfactualStatuses[i] = (a: a, t: t)
+            let cms = min(counterfactualStatuses)
+            if betterStatus(cms, minStatus) {
+                neededRest = remainingRest
+                break
+            }
+        }
+        let remaining = min(minStatus.a, minStatus.t)
+        let exhausted = remaining != nil && remaining <= 0
+        if exhausted {
+            if lastExhaustedlyActed != lastActed {
+                fade(now, go: false)
+            }
+            lastExhaustedlyActed = lastActed
+        }
+        
+        if betterStatus(minStatus, lastMinStatus) {
+            fade(now, go: true)
+        }
+        lastMinStatus = minStatus
+        
+        var distinctMinStatus = minStatus
+        if minStatus.a == restlessStatus.a {
+            distinctMinStatus.a = nil
+        }
+        if minStatus.t == restlessStatus.t {
+            distinctMinStatus.t = nil
+        }
         
         let statusBuffer = NSMutableAttributedString()
-        let statusStringGroups = ([errorStatusStringGroup] + [restStatusStringGroup] + meterStatusStringGroups).filter { !$0.isEmpty }
-        for (groupIndex, statusStringGroup) in enumerate(statusStringGroups) {
-            if groupIndex > 0 {
-                statusBuffer.appendAttributedString(NSAttributedString(string: "  ·  "))
-            }
-            for (i, s) in enumerate(statusStringGroup) {
-                if i > 0 {
-                    statusBuffer.appendAttributedString(NSAttributedString(string: "  "))
-                }
-                statusBuffer.appendAttributedString(s)
-            }
-        }
+        let errorStatusStringGroup = errorLog.count > 0 ? [red("\(errorLog.count)")] : []
+        let restStatusStringGroup = neededRest != nil && (exhausted || resting) ? [grayTime(neededRest!)] : []
+        let stop = exhausted ? [red("STOP")] : formatStatus(distinctMinStatus)
         
-        if shouldStop && !resting {
-            fade(now, go: false)
-        }
-        if mayGo {
-            mayGo = false
-            if !shouldStop {
-                fade(now, go: true)
+        let statusStrings = errorStatusStringGroup + restStatusStringGroup + stop + formatStatus(restlessStatus)
+        for (i, s) in enumerate(statusStrings) {
+            if i > 0 {
+                statusBuffer.appendAttributedString(NSAttributedString(string: "  "))
             }
+            statusBuffer.appendAttributedString(s)
         }
         
         storeState()
@@ -610,20 +730,32 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     var item: NSStatusItem?
     var app: App?
+    var paused = false
     
     func act(e: NSEvent!) {
-        app?.act(makeAction(e))
+        if !paused {
+            app?.act(makeAction(e))
+        }
     }
     
     func tick() {
+        let b = item!.button!
         if let s = app?.tick() {
-            item!.button!.attributedTitle = s
+            b.attributedTitle = s
         }
+        if paused {
+            b.setNextState()
+        }
+    }
+    
+    func pause() {
+        paused = !paused
+        app?.configure()
     }
     
     func applicationDidFinishLaunching(aNotification: NSNotification) {
         item = NSStatusBar.systemStatusBar().statusItemWithLength(/* NSVariableStatusItemLength */ -1)
-        let prompt: String = kAXTrustedCheckOptionPrompt.takeUnretainedValue()
+        let prompt: String = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as! String
         let trusted = AXIsProcessTrustedWithOptions([prompt: true]) != 0
         if item == nil || !trusted {
             NSApplication.sharedApplication().terminate(nil)
@@ -633,7 +765,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let root = "~/Library/Application Support/Ergometer".stringByStandardizingPath
         let errorLog = ErrorLog(root: root)
         app = App(clock: systemClock, makeFile: makeSystemFile, root: root, errorLog: errorLog)
-        NSTimer.scheduledTimerWithTimeInterval(1, target: self, selector: "tick", userInfo: nil, repeats: true)
+        
         let mask : NSEventMask =
             .KeyDownMask |
             .FlagsChangedMask |
@@ -641,6 +773,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             .RightMouseDownMask |
             .OtherMouseDownMask
         NSEvent.addGlobalMonitorForEventsMatchingMask(mask, handler: act)
+
+        NSTimer.scheduledTimerWithTimeInterval(1, target: self, selector: "tick", userInfo: nil, repeats: true)
+        
+        let b = item!.button!
+        b.target = self
+        b.action = "pause"
     }
 
     func applicationWillTerminate(aNotification: NSNotification) {
