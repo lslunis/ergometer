@@ -3,19 +3,19 @@
 from __future__ import division, print_function
 from collections import defaultdict
 from contextlib import contextmanager
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from functools import total_ordering
 from heapq import merge
 from itertools import chain, groupby, ifilter, imap, izip, repeat, starmap
 from os.path import basename, realpath
-from sys import _getframe
 import math
 import os
+import sys
 
 def F(*args, **kwds):
     if not args:
         raise TypeError('F() takes at least 1 argument (0 given)')
-    caller = _getframe(1)
+    caller = sys._getframe(1)
     names = {}
     names.update(caller.f_globals)
     names.update(caller.f_locals)
@@ -120,18 +120,50 @@ def print_day(events):
     lk = math.log(k or 1, 2)
     print(F('{day}\t{k}\t{lk}'))
 
-os.chdir(realpath(__file__ + '/../../log'))
-pairs = groupby(merge(*map(events_from_file, os.listdir('.'))), lambda e: e.day_number)
-for _, events in pairs:
-    print_day(events)
 
-def raw():
-    start_day = datetime(2015, 3, 7)
-    events = ifilter(lambda e: e.day_number >= start_day.toordinal(),
-        merge(*map(events_from_file, os.listdir('.'))))
-    rows = defaultdict(defaultdict(int))
+def intervals_in_timedelta(td, interval):
+    return int(td.total_seconds() // interval.total_seconds())
+
+
+def print_tsv_row(label, cells):
+    print('\t'.join(map(str, (label,) + tuple(cells))))
+
+
+def print_raw_data():
+    start_day = date(2015, 3, 7)
+    events = ifilter(
+        lambda e: e.day_number >= start_day.toordinal(),
+        merge(*map(events_from_file, os.listdir('.')))
+    )
+    rows = defaultdict(lambda: defaultdict(int))
     for e in events:
         rows[e.time_of_day][e.day] += e.cost
+    today = (datetime.now() - midnight_offset).date()
+    days = [
+        start_day + timedelta(days=i)
+        for i in xrange((today - start_day).days + 1)
+    ]
+    print_tsv_row('Time', days)
     step = timedelta(seconds=10)
-    for i in xrange(int(timedelta(days=1) / step)):
+    for i in xrange(intervals_in_timedelta(timedelta(days=1), step)):
         t = time_of_day_of(datetime(2000, 1, 1) + midnight_offset + step * i)
+        cells = [rows[t][day_of(day)] for day in days]
+        print_tsv_row(t, cells)
+
+
+def print_cost_per_day():
+    pairs = groupby(merge(*map(events_from_file, os.listdir('.'))), lambda e: e.day_number)
+    for _, events in pairs:
+        print_day(events)
+
+
+def main():
+    os.chdir(realpath(__file__ + '/../../log'))
+    if '-k' in sys.argv:
+        print_cost_per_day()
+    elif '-r' in sys.argv:
+        print_raw_data()
+
+
+if __name__ == '__main__':
+    main()
