@@ -404,6 +404,7 @@
 				A3A531B61AAB38760037D725 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 		A3A531B71AAB38760037D725 /* Build configuration list for PBXNativeTarget "ErgometerTests" */ = {
 			isa = XCConfigurationList;
@@ -412,6 +413,7 @@
 				A3A531B91AAB38760037D725 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
