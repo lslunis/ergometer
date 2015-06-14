@@ -4,7 +4,7 @@ from __future__ import division, print_function
 from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 from copy import deepcopy
-from datetime import date, datetime, time as dtime, timedelta
+from datetime import date, datetime, time as dtime, timedelta, tzinfo
 from functools import partial, total_ordering
 from glob import iglob
 from heapq import merge
@@ -16,6 +16,22 @@ from os.path import basename, realpath
 import re
 import sys
 from time import time, sleep
+import traceback
+
+class Local(tzinfo):
+    def utcoffset(self, dt):
+        now = time()
+        dt = datetime.utcfromtimestamp(now)
+        local_dt = datetime.fromtimestamp(now)
+        return dt - local_dt
+    def dst(self, dt):
+        return timedelta(0)
+
+tz = Local()
+
+sys.excepthook = lambda *args: ''.join(
+    [datetime.now(tz).isoformat(' '), ' '] + traceback.format_exception(*args))
+
 
 def F(*args, **kwds):
     if not args:
@@ -72,7 +88,7 @@ def cost_of(a):
     return sum(chain(a[Key], meta, a[Click]))
 
 def day_of(dt):
-    return F('{dt:%Y-%m-%d %a}')
+    return F('{dt:%Y-%m-%d}')
 
 def time_of_day_of(dt):
     return F('{dt:%I:%M:%S %p}')
@@ -206,6 +222,7 @@ def value_sorter(value_of, format_value):
     def get_columns(events, *args):
         pairs = groupby(events, lambda e: e.day_number)
         values = sorted((value_of(es) for i, es in pairs), reverse=True)
+        values += [format_value(0)] * (7 - len(values))
         return map(format_value, values)
     return get_columns
 
@@ -301,9 +318,8 @@ def copy_dict_to_object(d, o):
 
 def last_expirable_before(now):
     dt = datetime.utcfromtimestamp(now)
-    local_dt = datetime.fromtimestamp(now)
-    expire_hour = int((midnight_offset - (local_dt - dt)
-        ).total_seconds() // 3600)
+    expire_hour = int(
+        (midnight_offset + tz.utcoffset(dt)).total_seconds() // 3600)
     if dt.hour < expire_hour:
         dt -= timedelta(days=1)
     return datetime.combine(dt.date(), dtime(hour=expire_hour))
@@ -330,8 +346,7 @@ class Meter(object):
 
     def rest(self, last_acted, now):
         remaining_rest = last_acted + (self.rest_time or 0) - now
-        if (self.rest_time and remaining_rest <= 0
-                and self.first_acted is not None):
+        if self.rest_time and remaining_rest <= 0:
             self.app.reset(self)
         return remaining_rest
 
@@ -370,9 +385,7 @@ class App(object):
     prior_min_status = Status(None, None)
 
     def __init__(self, now, host):
-        self.fades = dict(
-            go=[1, 0, 0, 1, .2],
-            stop=[2, 1, 0, 0, .9])
+        self.fades = {}
         self.last_faded = defaultdict(int)
         self._meters = []
         self.named_meters = {}
@@ -432,21 +445,24 @@ class App(object):
             self.last_expired = datetime.utcfromtimestamp(now)
             for m in self.meters:
                 m.expire()
-            if all(not m.action_cost and not m.time_costs for m in self.meters):
+            if all(not m.action_cost for m in self.meters):
                 with open(self.positions_path, 'w') as f:
-                    json.dump(positions, f)
+                    json.dump(positions, f, indent=4, sort_keys=True)
 
-    def dispatch(self, cmd, args):
-        with open(F('{self.host}.{cmd}.txt'), 'w') as f:
-            f.write('\n'.join('\t'.join(str(x) for x in xs) for xs in args))
+    def dispatch(self, cmd, *args):
+        args = [[cmd]] + list(args)
+        print('\v'.join('\t'.join(str(x) for x in xs) for xs in args))
+        sys.stdout.flush()
 
     def fade(self, now, kind):
-        self.dispatch('fade', [self.fades[kind], [kind]])
+        if kind not in self.fades:
+            return
+        self.dispatch('fade', self.fades[kind])
         self.last_faded[kind] = now
 
     def status(self, colored_strings):
         strings, colors = zip(*colored_strings)
-        self.dispatch('status', [strings] + list(colors))
+        self.dispatch('status', strings, *colors)
 
     def rest(self, now):
         return [m.rest(self.last_acted, now) for m in self.meters]
@@ -502,12 +518,13 @@ class App(object):
         self.status(colored_strings)
 
 def serve(host, *args):
-    sys.stderr = open(F('{host}.error.log'), 'a')
+    sys.stderr = open(F('{host}.error.log'), 'a', 1)
     now = time()
     a = App(now, host)
+    last_preinit_expired = a.last_expired
     while True:
         a.configure(now)
-        for e in new_events(a.last_expired):
+        for e in new_events(last_preinit_expired):
             a.act(e)
         a.tick(now)
         sleep(1)

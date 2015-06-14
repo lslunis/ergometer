@@ -22,9 +22,8 @@ enum {
 @property NSMutableArray *record;
 @property NSMutableArray *pastRecords;
 @property NSString *recordPath;
-@property NSString *fadePath;
-@property NSString *statusPath;
 @property NSTask *server;
+@property NSString *commandPiece;
 
 @end
 
@@ -119,21 +118,14 @@ enum {
     return YES;
 }
 
-- (NSArray*)parse:(NSString *)p
+- (NSArray*)parse:(NSString *)s
 {
-    NSData *x = [[NSFileManager defaultManager] contentsAtPath:p];
-    if (x != nil) {
-        NSString *s = [[NSString alloc] initWithData:x encoding:NSUTF8StringEncoding];
-        if (s != nil) {
-            NSArray *lines = [s componentsSeparatedByString:@"\n"];
-            NSMutableArray *args = [[NSMutableArray alloc] init];
-            for (NSUInteger i = 0; i < lines.count; ++i) {
-                args[i] = [lines[i] componentsSeparatedByString:@"\t"];
-            }
-            return args;
-        }
+    NSArray *lines = [s componentsSeparatedByString:@"\v"];
+    NSMutableArray *args = [[NSMutableArray alloc] init];
+    for (NSUInteger i = 0; i < lines.count; ++i) {
+        args[i] = [lines[i] componentsSeparatedByString:@"\t"];
     }
-    return @[];
+    return args;
 }
 
 - (void)delete:(NSString *)p
@@ -156,45 +148,40 @@ enum {
     self.item.button.attributedTitle = s;
 }
 
-- (void)command
+- (void)dispatch:(NSString *)s
 {
-    NSArray *args = [self parse:self.fadePath];
-    if (args.count >= 1) {
-        NSArray *xs = (NSArray*)args[0];
-        if (xs.count >= 5) {
-            CGError result = [self fade:((NSString*)xs[0]).floatValue r:((NSString*)xs[1]).floatValue g:((NSString*)xs[2]).floatValue b:((NSString*)xs[3]).floatValue a:((NSString*)xs[4]).floatValue];
-            if (result == kCGErrorSuccess) {
-                [self delete:self.fadePath];
+    NSArray *args = [self parse:s];
+    if (args.count >= 2) {
+        if ([args[0][0] isEqualToString:@"fade"]) {
+            NSArray *xs = (NSArray*)args[1];
+            if (xs.count >= 5) {
+                [self fade:((NSString*)xs[0]).floatValue r:((NSString*)xs[1]).floatValue g:((NSString*)xs[2]).floatValue b:((NSString*)xs[3]).floatValue a:((NSString*)xs[4]).floatValue];
             }
         }
-    }
-    
-    args = [self parse:self.statusPath];
-    if (args.count >= 1) {
-        NSMutableAttributedString *b = [[NSMutableAttributedString alloc] init];
-        NSArray *strings = (NSArray*)args[0];
-        NSUInteger k = MIN(strings.count, args.count - 1);
-        for (NSUInteger i = 0; i < k; ++i) {
-            NSArray *xs = (NSArray*)args[i + 1];
-            NSDictionary *a;
-            if (xs.count >= 4) {
-                a = @{NSForegroundColorAttributeName: [NSColor colorWithRed:((NSString*)xs[0]).floatValue green:((NSString*)xs[1]).floatValue blue:((NSString*)xs[2]).floatValue alpha:((NSString*)xs[3]).floatValue]};
-            } else {
-                a = @{};
+
+        if ([args[0][0] isEqualToString:@"status"]) {
+            NSMutableAttributedString *b = [[NSMutableAttributedString alloc] init];
+            NSArray *strings = (NSArray*)args[1];
+            NSUInteger k = MIN(strings.count, args.count - 2);
+            for (NSUInteger i = 0; i < k; ++i) {
+                NSArray *xs = (NSArray*)args[i + 2];
+                NSDictionary *a;
+                if (xs.count >= 4) {
+                    a = @{NSForegroundColorAttributeName: [NSColor colorWithRed:((NSString*)xs[0]).floatValue green:((NSString*)xs[1]).floatValue blue:((NSString*)xs[2]).floatValue alpha:((NSString*)xs[3]).floatValue]};
+                } else {
+                    a = @{};
+                }
+                [b appendAttributedString:[[NSAttributedString alloc] initWithString:strings[i] attributes:a]];
             }
-            [b appendAttributedString:[[NSAttributedString alloc] initWithString:strings[i] attributes:a]];
-        }
-        if (k > 0) {
-            [self status:b];
-            [self delete:self.statusPath];
+            if (k > 0) {
+                [self status:b];
+            }
         }
     }
 }
 
 - (void)tick
 {
-    [self command];
-    
     [self cycle];
     int i = 0;
     for (id r in self.pastRecords) {
@@ -281,6 +268,19 @@ enum {
     [NSTimer scheduledTimerWithTimeInterval:1 target:self selector:@selector(tick) userInfo:nil repeats:YES];
 }
 
+- (void)readCommands:(NSNotification *)notification {
+    NSFileHandle *f = [notification object];
+    NSString *s = [[NSString alloc] initWithData:[f availableData] encoding:NSUTF8StringEncoding];
+    NSMutableArray *commands = [[s componentsSeparatedByString:@"\n"] mutableCopy];
+    commands[0] = [self.commandPiece stringByAppendingString:commands[0]];
+    self.commandPiece = commands.lastObject;
+    [commands removeLastObject];
+    for (id command in commands) {
+        [self dispatch:command];
+    }
+    [f waitForDataInBackgroundAndNotify];
+}
+
 - (void)applicationDidFinishLaunching:(NSNotification *)notification
 {
     NSDictionary *options = @{(__bridge id)kAXTrustedCheckOptionPrompt: @YES};
@@ -296,9 +296,6 @@ enum {
     
     NSString *host = [[NSHost currentHost] localizedName];
     NSString *dataDir = [@"~/Library/Application Support/Ergometer" stringByStandardizingPath];
-    self.fadePath = [@[dataDir, @"/", host, @".fade.txt"] componentsJoinedByString:@""];
-    self.statusPath = [@[dataDir, @"/", host, @".status.txt"] componentsJoinedByString:@""];
-    
     NSString *recordDir = [dataDir stringByAppendingString:@"/log"];
     self.recordPath = [@[recordDir, @"/", host, @".3.log"] componentsJoinedByString:@""];
 
@@ -310,7 +307,17 @@ enum {
         && [[NSFileManager defaultManager] createDirectoryAtPath:recordDir withIntermediateDirectories:YES attributes:nil error:NULL]) {
 
         if ([[NSFileManager defaultManager] isExecutableFileAtPath:serverPath]) {
-            self.server = [NSTask launchedTaskWithLaunchPath:serverPath arguments:@[@"_", host]];
+            self.server = [[NSTask alloc] init];
+            [self.server setLaunchPath:serverPath];
+            [self.server setArguments:@[@"_", host]];
+            NSPipe *pipe = [NSPipe pipe];
+            [self.server setStandardOutput:pipe];
+            [self.server launch];
+
+            self.commandPiece = @"";
+            NSFileHandle *f = [pipe fileHandleForReading];
+            [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(readCommands:) name:NSFileHandleDataAvailableNotification object:f];
+            [f waitForDataInBackgroundAndNotify];
         }
         [self listen];
         return;
