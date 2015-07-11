@@ -225,7 +225,7 @@ def value_sorter(value_of, format_value):
     def get_columns(events, *args):
         pairs = groupby(events, lambda e: e.day_number)
         values = sorted((value_of(es) for i, es in pairs), reverse=True)
-        values += [format_value(0)] * (7 - len(values))
+        values += [0] * (7 - len(values))
         return map(format_value, values)
     return get_columns
 
