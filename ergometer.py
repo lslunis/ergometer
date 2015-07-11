@@ -29,8 +29,11 @@ class Local(tzinfo):
 
 tz = Local()
 
-sys.excepthook = lambda *args: ''.join(
-    [datetime.now(tz).isoformat(' '), ' '] + traceback.format_exception(*args))
+def print_exc(*args):
+    print(datetime.now(tz).isoformat(' '),
+        ''.join(traceback.format_exception(*args)), file=sys.stderr)
+
+sys.excepthook = print_exc
 
 
 def F(*args, **kwds):
