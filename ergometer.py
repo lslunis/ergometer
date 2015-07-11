@@ -229,20 +229,15 @@ def value_sorter(value_of, format_value):
         return map(format_value, values)
     return get_columns
 
-# TODO: Split this function.
-def print_rows(get_columns, daynum_for_row=identity, daynum_for_value=None,
-        value_of=identity, value_type=list):
-    if not daynum_for_value:
-        daynum_for_value = daynum_for_row
-
-    daynum_to_value = defaultdict(value_type)
-    pairs = groupby(new_events(), lambda e: daynum_for_value(e.day_number))
+def print_rows(get_columns, daynum_for_row=identity):
+    daynum_to_value = defaultdict(list)
+    pairs = groupby(new_events(), lambda e: daynum_for_row(e.day_number))
     first_daynum = None
     for daynum, events in pairs:
         events = list(events)
         if first_daynum is None:
             first_daynum = daynum
-        daynum_to_value[daynum] = value_of(events)
+        daynum_to_value[daynum] = events
 
     daynums = xrange(first_daynum, today().toordinal() + 1)
     for daynum, _ in groupby(imap(daynum_for_row, daynums)):
@@ -250,15 +245,8 @@ def print_rows(get_columns, daynum_for_row=identity, daynum_for_value=None,
         columns = get_columns(daynum_to_value[daynum], daynum, daynum_to_value)
         print_tsv_row(day, *columns)
 
-def print_streaks(value_of, format_value):
-    def get_columns(value, daynum, daynum_to_value):
-        def max_streak(n):
-            def streak(start):
-                return min(daynum_to_value[i] for i in xrange(start, start + n))
-            start = daynum - int(n // 2)
-            return format_value(max(imap(streak, xrange(start, start + 7))))
-        return imap(max_streak, xrange(2, 6 + 1))
-    print_rows(get_columns, this_monday_of, identity, value_of, int)
+def print_weeks(value_of, format_value):
+    print_rows(value_sorter(value_of, format_value), this_monday_of)
 
 min_opt = partial(min, key=lambda x: float('inf') if x is None else x)
 
@@ -539,9 +527,8 @@ def main():
         c=[print_calendar],
         d=[print_rows, summarize],
         g=[print_rows, span_ratios_of],
-        k=[print_streaks, total_cost_of, identity],
-        ks=[print_rows, value_sorter(total_cost_of, identity), this_monday_of],
-        t=[print_streaks, total_span_of, format_time],
+        k=[print_weeks, total_cost_of, identity],
+        t=[print_weeks, total_span_of, format_time],
         w=[print_rows, summarize, this_monday_of],
         _=[serve])
     for c, f in commands.items():
