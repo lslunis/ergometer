@@ -141,9 +141,16 @@ def events_from_file(after, path):
             lambda e: after <= datetime.utcfromtimestamp(e.stop), events)
     return events
 
-def new_events(after=None):
-    paths = iglob('log/*.log')
-    new_paths = [p for p in paths if positions[p] < os.stat(p).st_size]
+def has_events(path):
+    try:
+        return positions[path] < os.path.getsize(path)
+    except OSError:
+        return False
+
+def new_events(after=None, warn_count=[0]):
+    paths = set(iglob('log/*.[1-3].log'))
+    warn_count[0] = len(set(iglob('log/*')) - paths)
+    new_paths = filter(has_events, paths)
     return merge(*map(partial(events_from_file, after), new_paths))
 
 def intervals_in_timedelta(td, interval):
@@ -376,6 +383,8 @@ class App(object):
     prior_min_status = Status(None, None)
 
     def __init__(self, now, host):
+        self.warn_path = F('{host}.error.log')
+        sys.stderr = open(self.warn_path, 'a', buffering=1)
         self.fades = {}
         self.last_faded = defaultdict(int)
         self._meters = []
@@ -467,7 +476,12 @@ class App(object):
         min_status = Status.min(statuses)
         return remaining_rests, restless_status, min_status
 
-    def tick(self, now):
+    def tick(self, now, warn_count=0):
+        try:
+            warn_count += os.path.getsize(self.warn_path)
+        except OSError:
+            pass
+
         remaining_rests, restless_status, min_status = self.update(now)
 
         needed_rest = None
@@ -494,13 +508,15 @@ class App(object):
 
         colored_strings = []
         self.update_preact(now)
+        warn = [red(warn_count)] if warn_count else []
         preact = self.activation_limit - self.activation_cost
         preact = [gray(preact)] if preact else []
         resting = now - self.last_acted > self.rest_delay
         showing_rest = needed_rest and (exhausted or resting)
         rest = [gray_time(needed_rest)] if showing_rest else []
         stop = [red('STOP')] if exhausted else format_status(min_status)
-        status_strings = preact + rest + stop + format_status(restless_status)
+        status_strings = warn + preact + rest + stop + format_status(
+            restless_status)
         for i, s in enumerate(status_strings):
             if i > 0:
                 colored_strings.append(spacer)
@@ -509,15 +525,18 @@ class App(object):
         self.status(colored_strings)
 
 def serve(host, *args):
-    sys.stderr = open(F('{host}.error.log'), 'a', 1)
     now = time()
     a = App(now, host)
     last_preinit_expired = a.last_expired
     while True:
-        a.configure(now)
-        for e in new_events(last_preinit_expired):
-            a.act(e)
-        a.tick(now)
+        try:
+            a.configure(now)
+            warn_count = [0]
+            for e in new_events(last_preinit_expired, warn_count):
+                a.act(e)
+            a.tick(now, warn_count[0])
+        except Exception:
+            print_exc(*sys.exc_info())
         sleep(1)
         now = time()
 
