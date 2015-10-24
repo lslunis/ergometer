@@ -5,6 +5,7 @@ from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 from copy import deepcopy
 from datetime import date, datetime, time as dtime, timedelta, tzinfo
+from errno import EPIPE
 from functools import partial, total_ordering
 from glob import iglob
 from heapq import merge
@@ -105,7 +106,9 @@ class Event(object):
     def __init__(self, span, record):
         self.start = record[0][0] * span
         self.stop = self.start + span
-        self.cost = cost_of(defaultdict(list, enumerate(record[1:])))
+        a = defaultdict(list, enumerate(record[1:]))
+        self.cost = cost_of(a)
+        self.scroll = sum(a[Scroll])
         self.dt = datetime.fromtimestamp(self.start)
         self.day_dt = self.dt - midnight_offset
         self.day_number = self.day_dt.toordinal()
@@ -132,10 +135,10 @@ def LineParser(version):
     return smoothed_events
 
 
-def events_from_file(after, path):
+def events_from_file(after, path, sieve=None):
     version = int(basename(path).split('.')[1])
     events = imap(LineParser(version), lines_from_file(path))
-    events = ifilter(lambda e: e.cost > 0, events)
+    events = ifilter(lambda e: sieve or e.cost > 0, events)
     if after:
         events = ifilter(
             lambda e: after <= datetime.utcfromtimestamp(e.stop), events)
@@ -147,11 +150,12 @@ def has_events(path):
     except OSError:
         return False
 
-def new_events(after=None, warn_count=[0]):
+def new_events(after=None, warn_count=[0], sieve=None):
     paths = set(iglob('log/*.[1-3].log'))
     warn_count[0] = len(set(iglob('log/*')) - paths)
+    get_events = partial(events_from_file, after, sieve=sieve)
     new_paths = filter(has_events, paths)
-    return merge(*map(partial(events_from_file, after), new_paths))
+    return merge(*map(get_events, new_paths))
 
 def intervals_in_timedelta(td, interval):
     return int(td.total_seconds() // interval.total_seconds())
@@ -228,6 +232,11 @@ def span_ratios_of(events, *args):
     return [format(spans[i + 1] / (span or 1), '.3')
         for i, span in enumerate(spans[:-1])]
 
+def scroll_count_of(events, *args):
+    return [sum(e.scroll for e in events)]
+
+scroll_count_of.sieve = lambda e: e.scroll > 0
+
 def value_sorter(value_of, format_value):
     def get_columns(events, *args):
         pairs = groupby(events, lambda e: e.day_number)
@@ -238,7 +247,9 @@ def value_sorter(value_of, format_value):
 
 def print_rows(get_columns, daynum_for_row=identity):
     daynum_to_value = defaultdict(list)
-    pairs = groupby(new_events(), lambda e: daynum_for_row(e.day_number))
+    sieve = getattr(get_columns, 'sieve', None)
+    key = lambda e: daynum_for_row(e.day_number)
+    pairs = groupby(new_events(sieve=sieve), key)
     first_daynum = None
     for daynum, events in pairs:
         events = list(events)
@@ -441,8 +452,9 @@ class App(object):
         source.time_costs.clear()
 
     def expire(self, now):
-        if self.last_expired < last_expirable_before(now):
-            self.last_expired = datetime.utcfromtimestamp(now)
+        last_expirable = last_expirable_before(now)
+        if self.last_expired < last_expirable:
+            self.last_expired = last_expirable
             for m in self.meters:
                 m.expire()
             if all(not m.action_cost for m in self.meters):
@@ -527,16 +539,17 @@ class App(object):
 def serve(host, *args):
     now = time()
     a = App(now, host)
-    last_preinit_expired = a.last_expired
     while True:
         try:
             a.configure(now)
             warn_count = [0]
-            for e in new_events(last_preinit_expired, warn_count):
+            for e in new_events(last_expirable_before(now), warn_count):
                 a.act(e)
             a.tick(now, warn_count[0])
-        except Exception:
+        except Exception as e:
             print_exc(*sys.exc_info())
+            if getattr(e, 'error', None) == EPIPE:
+                raise
         sleep(1)
         now = time()
 
@@ -547,6 +560,7 @@ def main():
         d=[print_rows, summarize],
         g=[print_rows, span_ratios_of],
         k=[print_weeks, total_cost_of, identity],
+        s=[print_rows, scroll_count_of],
         t=[print_weeks, total_span_of, format_time],
         w=[print_rows, summarize, this_monday_of],
         _=[serve])
