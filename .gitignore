@@ -1,2 +1,1 @@
-*.xccheckout
-xcuserdata
+node_modules/
