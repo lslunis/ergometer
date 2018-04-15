@@ -1,11 +1,16 @@
-import {setOpener} from './model.mjs'
-import {getOpener} from './sqlite.mjs'
+import {setConnector} from './model.mjs'
+import {getConnector} from './sqlite.mjs'
 import {tests} from './test.mjs'
-setOpener(getOpener({temporary: true}))
+
+console.log('setConnector')
+setConnector(getConnector({temporary: true}))
 
 import './model.test.mjs'
 
 ;(async () => {
-    await Promise.all(tests)
-    console.log(`${tests.length} pass`)
+  for (const test of tests) {
+    test()
+  }
+  await Promise.all(tests)
+  console.log(`${tests.length} pass`)
 })()

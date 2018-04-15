@@ -1,15 +1,41 @@
-export function setOpener(){}
+let connect
 
-`
-create table records(
-    id integer primary key autoincrement,
-    t1 real unique on conflict rollback,
-    t2 real unique on conflict rollback,
-    k text,
-    v text)
+export function setConnector(connector) {
+  console.log(connect)
+  connect = connector
+  console.log(connect)
+}
 
-create table queue(
-    rid integer
-    foreign key(rid) references records(id),
-    primary key(rid, peer)) without rowid
-`
+export class Model {
+  constructor() {
+    console.log('model')
+    this.transact = connect(1, oldVersion => run => {
+      if (oldVersion != 0) {
+        die({oldVersion})
+      }
+      run(`
+        create table peers(
+          id integer primary key autoincrement)`)
+      run(`
+        create table records(
+          id integer primary key autoincrement,
+          creator integer,
+          ctime real,
+          start real,
+          stop real,
+          k text,
+          v text,
+          foreign key(creator) references peers(id))`)
+      run(`
+        create table queue(
+          record integer,
+          peer integer,
+          foreign key(record) references records(id),
+          primary key(record, peer)
+        ) without rowid`)
+    })
+  }
+}
+
+
+
