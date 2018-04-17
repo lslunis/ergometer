@@ -4,5 +4,8 @@
     "private": true,
     "dependencies": {
         "sqlite3": "4.0.0"
+    },
+    "devDependencies": {
+        "express": "4.16.3"
     }
 }
