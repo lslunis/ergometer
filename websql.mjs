@@ -5,7 +5,7 @@ let nextId = 0
 
 export const getConnector =
         ({temporary = false} = {}) => (newVersion, changeVersionFrom) => {
-    const name = tempory ? `temp${nextId++}` : 'ergometer'
+    const name = temporary ? `temp${nextId++}` : 'ergometer'
     const db = openDatabase(name, '', name, 5 * 1024 ** 2)
     
     const transactWith = runTransaction => execute => {
@@ -17,14 +17,18 @@ export const getConnector =
         })
         return promise
       })
-      runTransaction(t => tx = t, error => transactor.reject(error))
-      return transactor.execute(execute)
+      runTransaction(t => {
+        tx = t
+        transactor.begin()
+      }, error => transactor.fail(error))
+      transactor.execute(execute)
+      return transactor.executorPromise
     }
 
     if (db.version != newVersion) {
-      transactWith((...args) => {
-        db.changeVersion(db.version, newVersion, ...args)
-      })(changeVersionFrom(db.version))
+      transactWith(
+        db.changeVersion.bind(db, db.version, newVersion)
+      )(changeVersionFrom(db.version))
     }
 
     return transactWith(db.transaction.bind(db))

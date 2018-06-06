@@ -13,7 +13,7 @@ export const getConnector =
     const filename = 'ergometer.sqlite'
     const db = new sqlite3.Database(temporary ? '' : filename)
     db.on('error', die)
-    const invoke = $(db.all)
+    const invoke = $(db.all.bind(db))
     let nextTransaction = Promise.resolve()
     const transact = async (execute) => {
         const currentTransaction = nextTransaction
@@ -26,10 +26,12 @@ export const getConnector =
                 try {
                     return await invoke(...args)
                 } catch (error) {
-                    transactor.reject(error)
+                    transactor.fail(error)
                 }
             })
-            await transactor.execute(execute)
+            transactor.begin()
+            transactor.execute(execute)
+            await transactor.executorPromise
             await invoke('commit')
         } finally {
             lock.resolve()
