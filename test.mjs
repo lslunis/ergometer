@@ -1,13 +1,15 @@
+import {setConnector} from './model.mjs'
+
 const tests = []
 
-export async function test(fn) {
-    tests.push(async () => fn())
+export function test(f) {
+    tests.push(async () => f())
 }
 
-export async function run() {
-    for (const test of tests) {
-        test()
-    }
+export async function run(getConnector, ...modulePaths) {
+    setConnector(getConnector({temporary: true}))
+    await Promise.all(['./model.test.mjs', ...modulePaths].map(m => import(m)))
+    tests.map(f => f())
     await Promise.all(tests)
-    return tests.length
+    console.log(`${tests.length} pass`)
 }
