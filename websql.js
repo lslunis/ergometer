@@ -1,5 +1,5 @@
-import {makePromise} from './util.mjs'
-import {makeTransactor} from './transactor.mjs'
+import {makePromise} from './util.js'
+import {makeTransactor} from './transactor.js'
 
 let nextId = 0
 
@@ -7,7 +7,7 @@ export const getConnector =
         ({temporary = false} = {}) => (newVersion, changeVersionFrom) => {
     const name = temporary ? `temp${nextId++}` : 'ergometer'
     const db = openDatabase(name, '', name, 5 * 1024 ** 2)
-    
+
     const transactWith = runTransaction => execute => {
       let tx
       const transactor = makeTransactor((query, ...args) => {

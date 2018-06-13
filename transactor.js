@@ -1,4 +1,4 @@
-import {makePromise} from './util.mjs'
+import {makePromise} from './util.js'
 
 export function makeTransactor(invoke) {
     let done = false
@@ -28,7 +28,7 @@ export function makeTransactor(invoke) {
     return {
         begin: beginning.resolve,
         executorPromise: executor.promise,
-        
+
         execute(execute) {
             execute(run)
         },

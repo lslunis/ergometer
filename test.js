@@ -1,4 +1,4 @@
-import {setConnector} from './model.mjs'
+import {setConnector} from './model.js'
 
 const tests = []
 
@@ -8,7 +8,7 @@ export function test(f) {
 
 export async function run(getConnector, ...modulePaths) {
     setConnector(getConnector({temporary: true}))
-    await Promise.all(['./model.test.mjs', ...modulePaths].map(m => import(m)))
+    await Promise.all(['./model.test.js', ...modulePaths].map(m => import(m)))
     await Promise.all(tests.map(f => f()))
-    console.log(`${tests.length} pass`)
+    document.body.textContent = `${tests.length} pass`
 }

@@ -1,6 +1,6 @@
-import * as assert from './assert.mjs';
-import {test} from './test.mjs'
-import {Model} from './model.mjs'
+import * as assert from './assert.js';
+import {test} from './test.js'
+import {Model} from './model.js'
 
 test(async () => {
     const model = new Model
