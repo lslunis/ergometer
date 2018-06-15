@@ -8,3 +8,16 @@ test(async () => {
         assert.equals([{1: 1}], await run('select 1'))
     })
 })
+
+test(async () => {
+    const model = new Model
+    const status = await model.status()
+    assert.equals({
+        monitoring: true,
+        metrics: [
+            {name: 'daily', target: 0, value: 0},
+            {name: 'session', target: 0, value: 0},
+            {name: 'rest', target: 0, value: 0},
+        ],
+    }, status)
+})
