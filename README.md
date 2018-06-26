@@ -1,7 +1,14 @@
-Ergometer
-=========
-Ergometer is an application for OS X that counts keystrokes and mouse clicks over various intervals of time, shows this information in the system status bar, and logs it in a human-readable text format.
+# Ergometer
+Ergometer is a [browser extension][1] intended to prevent or mitigate RSI by monitoring user activity.
 
-Optionally, it can be configured to enforce keystroke and time limits by fading the screen until a configurable resting period has elapsed.
+With it, you can:
+- Configure targets (enforced by increasingly insistent reminders) for total daily activity, individual activity sessions, and rest breaks between sessions.
+- Pause or resume monitoring at any time.
+- Display historical activity.
 
-If Ergometer is installed on multiple Macs and its configuration/logging directory is synced by a service like Dropbox or Google Drive, the application will share a single configuration and will merge the logs so that any activity limits are enforced based on the sum total of activity.
+## Roadmap
+- Backup and sync
+- UI polish
+- Mobile app
+
+[1]: https://chrome.google.com/webstore/detail/ergometer/eoglffpgmfalknfnddidnlkbglbdlgka
