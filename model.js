@@ -17,6 +17,10 @@ export class Model {
         })
     }
 
+    async history() {
+        return []
+    }
+
     async status() {
         return {
             monitoring: true,
