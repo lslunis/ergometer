@@ -1,30 +1,29 @@
-let connect
+import {Duration} from './duration.js'
 
-export function setConnector(connector) {
-    connect = connector
-}
-
-function makeMetric(name) {
-    return {name, target: 0, value: 0}
+function makeMetric([name, target]) {
+    return {name, target, value: 0}
 }
 
 export class Model {
     constructor() {
-        this.transact = connect(1, oldVersion => run => {
+        this.transact = Model.connect(1, oldVersion => run => {
             if (oldVersion != 0) {
                 die({oldVersion})
             }
         })
+        this.idleDelay = Duration.s(15)
+        this._monitored = false
     }
 
-    async history() {
-        return []
-    }
-
-    async status() {
-        return {
-            monitoring: true,
-            metrics: ['daily', 'session', 'rest'].map(makeMetric),
+    async store(record) {
+        if (record.monitored != null) {
+            this._monitored = record.monitored
         }
+    }
+
+    async monitored() { return this._monitored }
+
+    async collate(time, {history = false} = {}) {
+
     }
 }
