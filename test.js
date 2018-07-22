@@ -30,7 +30,7 @@ export function test(f, first) {
 }
 
 ;(async () => {
-  await Promise.all(['util', 'sql'].map(m => import(`./${m}.test.js`)))
+  await Promise.all(['sql', 'time', 'util'].map(m => import(`./${m}.test.js`)))
   let message = 'some tests fail'
   try {
     let count = 0
