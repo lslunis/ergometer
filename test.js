@@ -22,24 +22,37 @@ export const expect = actual => ({
   },
 })
 
-const firstTests = []
-const otherTests = []
+const tests = []
 
-export function test(f, first) {
-  ;(first ? firstTests : otherTests).push(f)
+export function test(f) {
+  tests.push(f)
 }
 
 ;(async () => {
-  await Promise.all(['sql', 'time', 'util'].map(m => import(`./${m}.test.js`)))
-  let message = 'some tests fail'
-  try {
-    let count = 0
-    for (const tests of [firstTests, otherTests]) {
-      await Promise.all(tests.map(f => f()))
-      count += tests.length
-    }
-    message = `${count} tests pass`
-  } finally {
-    console.log((document.body.textContent = message))
+  await Promise.all(['util', 'time'].map(m => import(`./${m}.test.js`)))
+  let runningCount = tests.length
+  let passCount = 0
+  await new Promise(resolve => {
+    tests.map(async f => {
+      try {
+        await f()
+        passCount++
+      } finally {
+        if (!--runningCount) {
+          resolve()
+        }
+      }
+    })
+  })
+  const failCount = tests.length - passCount
+  let message
+  if (!failCount) {
+    message = `${passCount} tests pass`
+    console.log(message)
+  } else {
+    message = `${failCount} tests fail`
+    console.error(message)
+    document.body.style.color = 'red'
   }
+  document.body.textContent = message
 })()
