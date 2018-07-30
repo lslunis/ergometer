@@ -3,22 +3,25 @@ import {assert, makePromise} from './util.js'
 const unitToFactor = new Map()
 
 export class Duration {
-  static make(value) {
-    if (value instanceof Duration) return value
-    if (value == 0) return new Duration(0)
-
-    const [[unit, unitValue]] = Object.entries(value)
+  static make(duration) {
+    if (duration instanceof Duration) {
+      return duration
+    }
+    if ([-Infinity, 0, Infinity].includes(duration)) {
+      return new Duration(duration)
+    }
+    const [[unit, unitValue]] = Object.entries(duration)
     return Duration[unit](unitValue)
   }
 
-  constructor(value) {
-    this.value = value
+  constructor(duration) {
+    this.duration = duration
   }
 
   between(low, high) {
     return (
-      Duration.make(low).value < this.value &&
-      this.value < Duration.make(high).value
+      Duration.make(low).duration < this.duration &&
+      this.duration < Duration.make(high).duration
     )
   }
 
@@ -55,19 +58,19 @@ export class Duration {
     Duration[unit] = value => new Duration(value * factor)
     Object.defineProperty(Duration.prototype, unit, {
       get() {
-        return this.value / factor
+        return this.duration / factor
       },
     })
   }
 }
 
 export class Time {
-  constructor(value) {
-    this.value = value
+  constructor(sinceEpoch) {
+    this.sinceEpoch = Duration.make(sinceEpoch)
   }
 
   toString() {
-    return `[Time: ${this.value.milliseconds} ms since Unix epoch]`
+    return `[Time: ${this.sinceEpoch.milliseconds} ms since Unix epoch]`
   }
 
   valueOf() {
