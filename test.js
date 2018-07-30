@@ -29,7 +29,9 @@ export function test(f) {
 }
 
 ;(async () => {
-  await Promise.all(['util', 'time'].map(m => import(`./${m}.test.js`)))
+  await Promise.all(
+    ['util', 'time', 'outbox'].map(m => import(`./${m}.test.js`)),
+  )
   let runningCount = tests.length
   let passCount = 0
   await new Promise(resolve => {
