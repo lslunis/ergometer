@@ -18,11 +18,12 @@ export class Duration {
     this.duration = duration
   }
 
+  lessThan(duration) {
+    return this.duration < Duration.make(duration).duration
+  }
+
   between(low, high) {
-    return (
-      Duration.make(low).duration < this.duration &&
-      this.duration < Duration.make(high).duration
-    )
+    return Duration.make(low).lessThan(this) && this.lessThan(high)
   }
 
   toString() {
@@ -67,6 +68,10 @@ export class Duration {
 export class Time {
   constructor(sinceEpoch) {
     this.sinceEpoch = Duration.make(sinceEpoch)
+  }
+
+  lessThan(time) {
+    return this.sinceEpoch.lessThan(time.sinceEpoch)
   }
 
   toString() {

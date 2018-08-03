@@ -30,7 +30,7 @@ export function test(f) {
 
 ;(async () => {
   await Promise.all(
-    ['util', 'time', 'outbox'].map(m => import(`./${m}.test.js`)),
+    ['model', 'outbox', 'time', 'util'].map(m => import(`./${m}.test.js`)),
   )
   let runningCount = tests.length
   let passCount = 0
