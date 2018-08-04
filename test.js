@@ -1,3 +1,23 @@
+function log(message, isError) {
+  if (isError) {
+    console.error(message)
+  } else {
+    console.log(message)
+  }
+  const p = document.createElement('p')
+  p.textContent = message
+  if (isError) {
+    p.style.color = 'red'
+  }
+  document.body.appendChild(p)
+}
+
+function logError(message) {
+  log(message, true)
+}
+
+let rejectEnabled = true
+
 export const expect = actual => ({
   toEqual(expected) {
     expected = JSON.stringify(expected)
@@ -10,6 +30,9 @@ export const expect = actual => ({
     }
   },
   async toReject(expected = {}) {
+    if (!rejectEnabled) {
+      return
+    }
     try {
       await actual()
     } catch (e) {
@@ -22,6 +45,10 @@ export const expect = actual => ({
   },
 })
 
+expect.noReject = () => {
+  rejectEnabled = false
+}
+
 const tests = []
 
 export function test(f) {
@@ -29,6 +56,10 @@ export function test(f) {
 }
 
 ;(async () => {
+  addEventListener('unhandledrejection', ({reason}) => logError(reason))
+
+  addEventListener('error', ({error}) => logError(error))
+
   await Promise.all(
     ['model', 'outbox', 'time', 'util'].map(m => import(`./${m}.test.js`)),
   )
@@ -49,12 +80,11 @@ export function test(f) {
   const failCount = tests.length - passCount
   let message
   if (!failCount) {
-    message = `${passCount} tests pass`
-    console.log(message)
+    log(`${passCount} tests pass`)
   } else {
-    message = `${failCount} tests fail`
-    console.error(message)
-    document.body.style.color = 'red'
+    logError(`${failCount} tests fail`)
   }
-  document.body.textContent = message
+  if (!rejectEnabled) {
+    logError('Rejection expectations were disabled')
+  }
 })()
