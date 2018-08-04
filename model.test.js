@@ -2,12 +2,8 @@ import {Model} from './model.js'
 import {expect, test} from './test.js'
 import {Duration, Time} from './time.js'
 
-function parseTime(time) {
-  return new Time({milliseconds: Date.parse(time)})
-}
-
 async function loadModel(state) {
-  const model = new Model(parseTime('1970-01-01'), state)
+  const model = new Model(Time.parse('1970-01-01'), state)
   await model.loaded
   return model
 }
@@ -35,7 +31,7 @@ test(async () => {
   const m = await loadModel()
   const updateTarget = (time, minutes) =>
     m.update({
-      time: parseTime(time),
+      time: Time.parse(time),
       name: 'rest',
       target: Duration.make({minutes}),
     })

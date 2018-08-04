@@ -18,12 +18,35 @@ export class Duration {
     this.duration = duration
   }
 
+  plus(other) {
+    return Duration.milliseconds(this.duration + Duration.make(other).duration)
+  }
+
+  minus(other) {
+    return Duration.milliseconds(this.duration - Duration.make(other).duration)
+  }
+
+  times(scalar) {
+    return Duration.milliseconds(this.duration * scalar)
+  }
+
   lessThan(duration) {
     return this.duration < Duration.make(duration).duration
   }
 
-  between(low, high) {
+  strictlyBetween(low, high) {
     return Duration.make(low).lessThan(this) && this.lessThan(high)
+  }
+
+  format() {
+    const units = ['hours', 'minutes']
+    let remainder = this
+    const values = units.map(unit => {
+      const value = Math.floor(remainder[unit])
+      remainder = remainder.minus({[unit]: value})
+      return '' + value
+    })
+    return values.map((v, i) => (!i ? v : v.padStart(2, 0))).join(':')
   }
 
   toString() {
@@ -66,8 +89,21 @@ export class Duration {
 }
 
 export class Time {
-  constructor(sinceEpoch) {
+  static parse(time) {
+    const match = time.match(/([+-])(\d\d)(?::(\d\d))?$/)
+    let zone = Duration.make(0)
+    if (match) {
+      const [_, sign, hours, minutes = 0] = match
+      zone = Duration.make({hours})
+        .plus({minutes})
+        .times(sign == '+' ? 1 : -1)
+    }
+    return new Time({milliseconds: Date.parse(time)}, zone)
+  }
+
+  constructor(sinceEpoch, zone) {
     this.sinceEpoch = Duration.make(sinceEpoch)
+    this.zone = zone
   }
 
   lessThan(time) {
