@@ -1,9 +1,5 @@
 function log(message, isError) {
-  if (isError) {
-    console.error(message)
-  } else {
-    console.log(message)
-  }
+  console[isError ? 'error' : 'log'](message)
   const p = document.createElement('p')
   p.textContent = message
   if (isError) {
@@ -56,10 +52,8 @@ export function test(f) {
 }
 
 ;(async () => {
-  addEventListener('unhandledrejection', ({reason}) => logError(reason))
-
   addEventListener('error', ({error}) => logError(error))
-
+  addEventListener('unhandledrejection', ({reason}) => logError(reason))
   await Promise.all(
     ['model', 'outbox', 'time', 'util'].map(m => import(`./${m}.test.js`)),
   )
