@@ -20,9 +20,9 @@ async function flash(closeAfter) {
 }
 
 function now() {
-  const ds = Duration.milliseconds(Date.now()).deciseconds
+  const sinceEpoch = Duration.milliseconds(Date.now()).round('deciseconds')
   const zone = Duration.minutes(-new Date().getTimezoneOffset())
-  return new Time({deciseconds: Math.round(ds)}, zone)
+  return new Time(sinceEpoch, zone)
 }
 
 function setIcon({monitored}) {
