@@ -61,3 +61,14 @@ export function switchOnKey(object, handlers, defaultHandler) {
   }
   return assert(handler)(object)
 }
+
+export function* zip(...iterables) {
+  const iterators = iterables.map(it => it[Symbol.iterator]())
+  for (;;) {
+    const items = iterators.map(it => it.next())
+    if (items.every(({done}) => done)) {
+      return
+    }
+    yield items.map(({value}) => value)
+  }
+}

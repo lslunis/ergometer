@@ -1,5 +1,5 @@
 import {expect, test} from './test.js'
-import {enumerate, range, sha256, switchOnKey} from './util.js'
+import {enumerate, range, sha256, switchOnKey, zip} from './util.js'
 
 test(() => expect(enumerate('abc')).toEqual([[0, 'a'], [1, 'b'], [2, 'c']]))
 
@@ -28,3 +28,20 @@ test(() =>
   expect(switchOnKey({}, {constructor: () => 'c'}, () => 'd')).toEqual('d'),
 )
 test(() => expect(switchOnKey({constructor: 'c'}, {}, () => 'd')).toEqual('d'))
+
+test(() => expect(zip([], [])).toEqual([]))
+test(() => expect(zip([11, 22], [33, 44])).toEqual([[11, 33], [22, 44]]))
+test(() =>
+  expect(zip([10, 20, 30], [40, 50])).toEqual([
+    [10, 40],
+    [20, 50],
+    [30, undefined],
+  ]),
+)
+test(() =>
+  expect(zip([10, 20], [30, 40, 50])).toEqual([
+    [10, 30],
+    [20, 40],
+    [undefined, 50],
+  ]),
+)
