@@ -3,6 +3,15 @@ import {assert, makePromise} from './util.js'
 const unitToFactor = new Map()
 
 export class Duration {
+  static parse(duration) {
+    const [_, sign, hours, minutes = 0] = duration.match(
+      /^([+-]?)(\d+)(?::(\d\d))?$/,
+    )
+    return Duration.make({hours})
+      .plus({minutes})
+      .times(sign == '-' ? -1 : 1)
+  }
+
   static make(duration) {
     if (duration instanceof Duration) {
       return duration
@@ -90,15 +99,8 @@ export class Duration {
 
 export class Time {
   static parse(time) {
-    const match = time.match(/([+-])(\d\d)(?::(\d\d))?$/)
-    let zone = Duration.make(0)
-    if (match) {
-      const [_, sign, hours, minutes = 0] = match
-      zone = Duration.make({hours})
-        .plus({minutes})
-        .times(sign == '+' ? 1 : -1)
-    }
-    return new Time({milliseconds: Date.parse(time)}, zone)
+    const [_, zone = '0'] = time.match(/T.*([+-].*)|/)
+    return new Time({milliseconds: Date.parse(time)}, Duration.parse(zone))
   }
 
   constructor(sinceEpoch, zone) {
