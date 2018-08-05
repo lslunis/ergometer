@@ -1,6 +1,6 @@
 import {getOutboxInitialState, Outbox} from './outbox.js'
 import {Duration, Time} from './time.js'
-import {switchOnKey} from './util.js'
+import {switchOnKey, makeObject} from './util.js'
 
 function getInitialState() {
   const initialTarget = target => ({target, mtime: new Time(-Infinity)})
@@ -24,7 +24,12 @@ function getInitialState() {
 export const idleDelay = Duration.seconds(15)
 
 export class Model {
-  constructor(time, state, {onUpdate = () => {}, onPush} = {}) {
+  constructor(
+    time,
+    state,
+    {verbose = false, onUpdate = () => {}, onPush} = {},
+  ) {
+    this.verbose = verbose
     this.onUpdate = onUpdate
     this.preloadQueue = []
     this.outbox = this.state = null
@@ -44,6 +49,9 @@ export class Model {
     if (!state) {
       this.preloadQueue.push(() => this.update(event, peer))
       return
+    }
+    if (this.verbose) {
+      console.log({...event, peer})
     }
     if (!peer) {
       this.outbox.push(event)
@@ -69,5 +77,20 @@ export class Model {
       },
     })
     this.onUpdate()
+  }
+
+  getMetrics(time) {
+    const values = {
+      weekly: Duration.make(0),
+      daily: Duration.make(0),
+      session: Duration.make(0),
+      rest: Duration.make(0),
+    }
+    return makeObject(
+      Object.entries(values).map(([name, value]) => {
+        const target = this.state.targets[name].target
+        return [name, {name, value, target, attained: value >= target}]
+      }),
+    )
   }
 }
