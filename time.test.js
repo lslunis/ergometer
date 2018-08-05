@@ -18,6 +18,17 @@ test(() =>
 
 test(() => expect(Duration.days(5).times(-3)).toEqual(Duration.days(-15)))
 
+test(() => expect(Duration.hours(-30).round('days')).toEqual(Duration.days(-1)))
+test(() => expect(Duration.hours(-12).round('days')).toEqual(Duration.days(0)))
+test(() => expect(Duration.hours(8).round('days')).toEqual(Duration.days(0)))
+test(() => expect(Duration.hours(12).round('days')).toEqual(Duration.days(1)))
+test(() => expect(Duration.hours(22).round('days')).toEqual(Duration.days(1)))
+test(() => expect(Duration.hours(24).round('days')).toEqual(Duration.days(1)))
+test(() => expect(Duration.hours(30).round('days')).toEqual(Duration.days(1)))
+test(() => expect(Duration.hours(36).round('days')).toEqual(Duration.days(2)))
+test(() => expect(Duration.hours(40).round('days')).toEqual(Duration.days(2)))
+test(() => expect(Duration.hours(48).round('days')).toEqual(Duration.days(2)))
+
 test(() =>
   expect(
     Duration.hours(5).strictlyBetween(Duration.hours(4), Duration.hours(6)),

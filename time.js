@@ -41,6 +41,10 @@ export class Duration {
     return Duration.milliseconds(this.duration * scalar)
   }
 
+  round(unit) {
+    return Duration[unit](Math.round(this[unit]))
+  }
+
   lessThan(duration) {
     return this.duration < Duration.make(duration).duration
   }
