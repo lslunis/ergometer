@@ -32,6 +32,12 @@ test(() =>
   ),
 )
 
+test(() => expect(Time.parse('')).toEqual(null))
+
+test(() => expect(Time.parse('2018-01-01').zone).toEqual(Duration.make(0)))
+
+test(() => expect(Time.parse('2018-01-01T01:01:01')).toEqual(null))
+
 test(() =>
   expect(Time.parse('2018-01-01T00:00:00-08:30').zone).toEqual(
     Duration.hours(-8.5),

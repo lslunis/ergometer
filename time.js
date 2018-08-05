@@ -4,9 +4,11 @@ const unitToFactor = new Map()
 
 export class Duration {
   static parse(duration) {
-    const [_, sign, hours, minutes = 0] = duration.match(
-      /^([+-]?)(\d+)(?::(\d\d))?$/,
-    )
+    const match = duration.match(/^([+-]?)(\d+)(?::(\d\d))?$/)
+    if (!match) {
+      return null
+    }
+    const [_, sign, hours, minutes = 0] = match
     return Duration.make({hours})
       .plus({minutes})
       .times(sign == '-' ? -1 : 1)
@@ -99,7 +101,12 @@ export class Duration {
 
 export class Time {
   static parse(time) {
-    const [_, zone = '0'] = time.match(/T.*([+-].*)|/)
+    const pattern = '^0000-00-00(?:T00:00:00(?:Z|([+-]00(?::00)?)))?$'
+    const match = time.match(RegExp(pattern.replace(/0/g, '\\d')))
+    if (!match) {
+      return null
+    }
+    const [_, zone = '0'] = match
     return new Time({milliseconds: Date.parse(time)}, Duration.parse(zone))
   }
 
