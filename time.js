@@ -150,6 +150,9 @@ export function sleep(delay, object = {}) {
 }
 
 sleep.cancel = object => {
+  if (!object[sleepSymbol]) {
+    return
+  }
   clearTimeout(object[sleepSymbol].timeoutId)
   finish(object, {canceled: true})
 }

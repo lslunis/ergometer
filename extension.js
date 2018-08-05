@@ -76,7 +76,7 @@ const ports = new Map()
 browser.runtime.onConnect.addListener(port => {
   ports.set(port.name, port)
   port.onMessage.addListener(update)
-  port.onDisconnect(() => ports.delete(port.name))
+  port.onDisconnect.addListener(() => ports.delete(port.name))
   tick()
 })
 
@@ -94,10 +94,10 @@ browser.idle.queryState(idleDelay.seconds).then(idleStateChanged)
 
 let errorCount = 0
 function handleError(error) {
-  console.error(error)
   errorCount++
-  browser.browserAction.setBadgeText({text: errorCount})
+  browser.browserAction.setBadgeText({text: '' + errorCount})
   browser.browserAction.setBadgeBackgroundColor({color: 'red'})
+  throw error
 }
 
 addEventListener('error', ({error}) => handleError(error))

@@ -1,5 +1,6 @@
 export const black = '#222' // N1
 const gray = '#888' // N5
+export const white = '#fff' // N10
 
 const pink = '#fa006c' // 10.0RP-5-20
 const red = '#fc003c' // 5.0R-5-20
