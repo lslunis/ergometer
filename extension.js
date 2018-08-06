@@ -65,12 +65,23 @@ async function load() {
   return revive(results.state)
 }
 
+let storeCount = 0
+let meanStoreLatency = 0
+let maxStoreLatency = 0
 const model = new Model(now(), load(), {
   verbose: true,
   async onUpdate() {
     tick()
+    const start = performance.now()
     await browser.storage.local.set({state: JSON.stringify(model.state)})
-    // TODO: Log elapsed time to store, about once a day.
+    const latency = performance.now() - start
+    storeCount++
+    meanStoreLatency =
+      (meanStoreLatency * (storeCount - 1) + latency) / storeCount
+    maxStoreLatency = Math.max(maxStoreLatency, latency)
+    if (!(storeCount % 1000)) {
+      console.log({meanStoreLatency, maxStoreLatency})
+    }
   },
 })
 model.loaded.then(tick)
