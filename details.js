@@ -135,5 +135,3 @@ function draw(message) {
     }
   }
 }
-
-// FIXME: Display grid, repeat 4, ID metrics, right aligned
