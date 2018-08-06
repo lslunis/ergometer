@@ -1,5 +1,6 @@
 import {black, colorize} from './colors.js'
 import {idleDelay, Model} from './model.js'
+import {revive} from './reviver.js'
 import {Duration, Time, sleep} from './time.js'
 import {assert} from './util.js'
 
@@ -51,7 +52,7 @@ function tick() {
     return
   }
   const {monitored} = model.state
-  const metrics = model.getMetrics(now())
+  const metrics = colorize(model.getMetrics(now()))
   setIcon({monitored})
   send('details', {monitored, metrics})
   if (!metrics.rest.attained) {
@@ -64,10 +65,17 @@ function tick() {
   }
 }
 
-const model = new Model(now(), null, {
+async function load() {
+  const results = await browser.storage.local.get('state')
+  return revive(results.state)
+}
+
+const model = new Model(now(), load(), {
   verbose: true,
-  onUpdate() {
+  async onUpdate() {
     tick()
+    await browser.storage.local.set({state: JSON.stringify(model.state)})
+    // TODO: Log elapsed time to store, about once a day.
   },
 })
 model.loaded.then(tick)
@@ -84,7 +92,7 @@ function send(name, message) {
   if (!ports.has(name)) {
     return
   }
-  ports.get(name).postMessage(message)
+  ports.get(name).postMessage(JSON.stringify(message))
 }
 
 const idleStateChanged = idleState => update({idleState})

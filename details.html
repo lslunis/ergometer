@@ -1,7 +1,19 @@
 <!doctype html>
 <style>
-  html {
+  body {
     font: 14px Consolas, monospace;
+  }
+
+  #metrics {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    justify-items: end;
+    grid-gap: 0.5em 1em;
+  }
+
+  #monitored {
+    grid-column: span 3;
+    justify-self: start;
   }
 </style>
 <script src=browser-polyfill.js></script>
