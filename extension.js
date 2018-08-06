@@ -4,22 +4,6 @@ import {revive} from './reviver.js'
 import {Duration, Time, sleep} from './time.js'
 import {assert} from './util.js'
 
-async function flash(closeAfter) {
-  const {id} = await browser.windows.create({
-    url: 'flash.html',
-    type: 'popup',
-    state: 'fullscreen',
-  })
-  await sleep(closeAfter)
-  try {
-    await browser.windows.remove(id)
-  } catch (e) {
-    if (e.message != `No window with id: ${id}.`) {
-      throw e
-    }
-  }
-}
-
 function now() {
   const sinceEpoch = Duration.milliseconds(Date.now()).round('deciseconds')
   const zone = Duration.minutes(-new Date().getTimezoneOffset())
@@ -41,9 +25,20 @@ function setIcon({monitored}) {
   })
 }
 
-function update(event) {
-  event.time = now()
-  model.update(event)
+async function flash(closeAfter) {
+  const {id} = await browser.windows.create({
+    url: 'flash.html',
+    type: 'popup',
+    state: 'fullscreen',
+  })
+  await sleep(closeAfter)
+  try {
+    await browser.windows.remove(id)
+  } catch (e) {
+    if (e.message != `No window with id: ${id}.`) {
+      throw e
+    }
+  }
 }
 
 function tick() {
@@ -79,6 +74,11 @@ const model = new Model(now(), load(), {
   },
 })
 model.loaded.then(tick)
+
+function update(event) {
+  event.time = now()
+  model.update(event)
+}
 
 const ports = new Map()
 browser.runtime.onConnect.addListener(port => {
