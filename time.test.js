@@ -43,6 +43,11 @@ test(() =>
   ),
 )
 
+test(() => expect(Duration.make(0).format()).toEqual('0:00'))
+test(() => expect(Duration.seconds(1000).format()).toEqual('0:16'))
+test(() => expect(Duration.seconds(1000).format('seconds')).toEqual('0:16:40'))
+test(() => expect(Duration.weeks(1).format()).toEqual('168:00'))
+
 test(() => expect(Time.parse('')).toEqual(null))
 
 test(() => expect(Time.parse('2018-01-01').zone).toEqual(Duration.make(0)))

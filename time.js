@@ -53,8 +53,9 @@ export class Duration {
     return Duration.make(low).lessThan(this) && this.lessThan(high)
   }
 
-  format() {
-    const units = ['hours', 'minutes']
+  format(...units) {
+    // TODO: negative, infinity
+    units = ['hours', 'minutes', ...units]
     let remainder = this
     const values = units.map(unit => {
       const value = Math.floor(remainder[unit])
