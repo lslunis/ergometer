@@ -90,7 +90,16 @@ export class Model {
     return makeObject(
       Object.entries(values).map(([name, value]) => {
         const target = this.state.targets[name].target
-        return [name, {name, value, target, attained: !value.lessThan(target)}]
+        return [
+          name,
+          {
+            name,
+            value,
+            target,
+            advised: true,
+            attained: !value.lessThan(target),
+          },
+        ]
       }),
     )
   }

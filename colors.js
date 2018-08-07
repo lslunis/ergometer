@@ -18,7 +18,7 @@ const metricColors = {
 
 export function colorize(metrics) {
   Object.entries(metrics).map(([name, metric]) => {
-    const index = +metric[name == 'rest' ? 'suggested' : 'attained']
+    const index = +metric[name == 'rest' ? 'advised' : 'attained']
     metric.color = metricColors[name][index]
   })
   return metrics
