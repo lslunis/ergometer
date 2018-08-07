@@ -73,7 +73,7 @@ test(async () => {
   expect(await sleep(Duration.milliseconds(4))).toEqual(false)
   const elapsed = Duration.milliseconds(Date.now() - now)
   expect(
-    elapsed.strictlyBetween({milliseconds: 4 - 1}, {milliseconds: 4 + 6}),
+    elapsed.strictlyBetween({milliseconds: 4 - 1}, {milliseconds: 4 + 20}),
   ).toEqual(true)
 })
 
@@ -85,6 +85,6 @@ test(async () => {
   expect(await promise).toEqual(true)
   const elapsed = Duration.milliseconds(Date.now() - now)
   expect(
-    elapsed.strictlyBetween({milliseconds: 0 - 1}, {milliseconds: 20}),
+    elapsed.strictlyBetween({milliseconds: 0 - 1}, {milliseconds: 1 + 20}),
   ).toEqual(true)
 })
