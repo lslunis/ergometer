@@ -1,7 +1,22 @@
 import {expect, test} from './test.js'
-import {enumerate, mod, range, sha256, switchOnKey, zip} from './util.js'
+import {
+  enumerate,
+  makeExponential,
+  mod,
+  range,
+  sha256,
+  switchOnKey,
+  zip,
+} from './util.js'
 
 test(() => expect(enumerate('abc')).toEqual([[0, 'a'], [1, 'b'], [2, 'c']]))
+
+test(() => {
+  const exp2 = makeExponential({x0: 0, x1: 1, y0: 1, y1: 2})
+  expect(exp2(-1)).toEqual(0.5)
+  expect(exp2(2)).toEqual(4)
+  expect(exp2(10)).toEqual(1024)
+})
 
 test(() => expect(mod(5, 5)).toEqual(0))
 test(() => expect(mod(2, 5)).toEqual(2))

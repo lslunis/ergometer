@@ -12,6 +12,9 @@ export function* enumerate(it) {
   }
 }
 
+export const makeExponential = ({x0, x1, y0, y1}) => x =>
+  y0 * (y1 / y0) ** ((x - x0) / (x1 - x0))
+
 export function makeObject(entries) {
   const object = {}
   for (const [name, value] of entries) {
