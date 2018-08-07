@@ -1,7 +1,18 @@
 import {expect, test} from './test.js'
-import {enumerate, range, sha256, switchOnKey, zip} from './util.js'
+import {enumerate, mod, range, sha256, switchOnKey, zip} from './util.js'
 
 test(() => expect(enumerate('abc')).toEqual([[0, 'a'], [1, 'b'], [2, 'c']]))
+
+test(() => expect(mod(5, 5)).toEqual(0))
+test(() => expect(mod(2, 5)).toEqual(2))
+test(() => expect(mod(8, 5)).toEqual(3))
+test(() => expect(mod(-1, 5)).toEqual(4))
+test(() => expect(mod(-5, 5)).toEqual(0))
+test(() => expect(mod(0, -2)).toEqual(0))
+test(() => expect(mod(1, -5)).toEqual(-4))
+test(() => expect(mod(-1, -5)).toEqual(-1))
+test(() => expect(mod(7, 1)).toEqual(0))
+test(() => expect(mod(7, -1)).toEqual(0))
 
 test(() => expect(() => range().next()).toReject())
 test(() => expect(range(2)).toEqual([0, 1]))

@@ -35,6 +35,14 @@ export function* map(it, f) {
   }
 }
 
+export function mod(dividend, divisor) {
+  let remainder = dividend % divisor
+  if (remainder && Math.sign(dividend) != Math.sign(divisor)) {
+    remainder += divisor
+  }
+  return remainder
+}
+
 export function* range(...args) {
   assert(args.length)
   const [start, end, step = 1] = args.length > 1 ? args : [0, args[0]]
