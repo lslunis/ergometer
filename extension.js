@@ -90,11 +90,12 @@ function update(event) {
   event.time = now()
   model.update(event)
 }
+window.ergoUpdate = () => update({name: 'rest', target: Duration.hours(42)})
 
 const ports = new Map()
 browser.runtime.onConnect.addListener(port => {
   ports.set(port.name, port)
-  port.onMessage.addListener(update)
+  port.onMessage.addListener(async event => update(await revive(event)))
   port.onDisconnect.addListener(() => ports.delete(port.name))
   tick()
 })

@@ -1,5 +1,6 @@
 import {black, white} from './colors.js'
 import {revive} from './reviver.js'
+import {Duration} from './time.js'
 import {assert, zip} from './util.js'
 
 function setColors({style}, color, background) {
@@ -22,7 +23,7 @@ port.onMessage.addListener(message =>
 )
 
 function update(event) {
-  port.postMessage(event)
+  port.postMessage(JSON.stringify(event))
 }
 
 class Label {
@@ -72,16 +73,26 @@ class TextField {
     node.id = this.name
     node.type = 'text'
     node.addEventListener('change', () => {
-      /* FIXME
-      Target on change
-      \d*([.:]?)\d*
-      null if falsy, otherwise duration hours and round to minutes
-      or duration parse
-      not null and strictly between zero and 1000 hours, clear error message,
-        clear value, update name, target
-      update({name: this.name, target})
-      otherwise, element set custom validity error message: h:mm
-      */
+      let target
+      const match = node.value.match(/^\d*([.:]?)\d*$/)
+      if (match) {
+        const [string, separator] = match
+        if (separator == ':') {
+          target = Duration.parse(string)
+        } else {
+          const hours = +string
+          if (hours) {
+            target = Duration.make({hours}).round('minutes')
+          }
+        }
+      }
+      if (target && target.strictlyBetween(0, {hours: 1000})) {
+        node.setCustomValidity('')
+        node.value = ''
+        update({name: this.name, target})
+      } else {
+        node.setCustomValidity('h:mm')
+      }
     })
 
     return node
