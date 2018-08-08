@@ -45,3 +45,22 @@ test(async () => {
   updateTarget('2011-11-11T11:11:12Z', 2)
   expectTarget().toEqual(2)
 })
+
+test(async () => {
+  const m = await loadModel()
+  const addDailyValue = (time, value) =>
+    m.addDailyValue(Time.parse(time), Duration.seconds(value))
+  const expectDailyValue = day => expect(m.state.dailyValues[day].seconds)
+
+  addDailyValue('1970-01-01', 3)
+  expectDailyValue(-1).toEqual(3)
+  addDailyValue('1970-01-01', 2)
+  expectDailyValue(-1).toEqual(5)
+  addDailyValue('1970-01-01', -1)
+  expectDailyValue(-1).toEqual(4)
+  addDailyValue('1970-01-01', -5)
+  expectDailyValue(-1).toEqual(0)
+
+  addDailyValue('1970-01-02', -1)
+  expectDailyValue(0).toEqual(0)
+})

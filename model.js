@@ -1,6 +1,6 @@
 import {getOutboxInitialState, Outbox} from './outbox.js'
 import {Duration, Time} from './time.js'
-import {switchOnKey, makeObject} from './util.js'
+import {makeObject, mod, switchOnKey} from './util.js'
 
 function getInitialState() {
   const initialTarget = target => ({target, mtime: new Time(-Infinity)})
@@ -42,6 +42,21 @@ export class Model {
     this.outbox = new Outbox(this.state.outbox, onPush)
     this.preloadQueue.map(f => f())
     this.preloadQueue = null
+  }
+
+  addDailyValue(time, value) {
+    const {state} = this
+    const day = Math.floor(
+      time.sinceEpoch.plus(time.zone).minus({hours: 4}).days,
+    )
+    state.firstWeek = Math.min(state.firstWeek, day - mod(day - 4, 7))
+    const unit = 'milliseconds'
+    value = value[unit]
+    const oldValue = state.dailyValues[day]
+    if (oldValue) {
+      value += oldValue[unit]
+    }
+    state.dailyValues[day] = Duration[unit](Math.max(0, value))
   }
 
   update(event, peer = 0) {
