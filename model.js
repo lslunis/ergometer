@@ -13,7 +13,7 @@ function getInitialState() {
       session: initialTarget(Duration.hours(1)),
       rest: initialTarget(Duration.minutes(5)),
     },
-    lastIdleStates: {},
+    lastActives: {},
     timelines: {},
     sharedTimeline: [],
     firstWeek: Infinity,
@@ -90,7 +90,9 @@ export class Model {
           t.target = target
         }
       },
-      idleState() {},
+      idleState({time, idleState}) {
+        state.lastActives[peer] = idleState == 'active'
+      },
     })
     this.onUpdate()
   }
