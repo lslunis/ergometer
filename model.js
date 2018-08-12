@@ -1,6 +1,6 @@
 import {getOutboxInitialState, Outbox} from './outbox.js'
 import {Duration, Time} from './time.js'
-import {makeObject, mod, switchOnKey} from './util.js'
+import {lowerBound, makeObject, mod, switchOnKey, upperBound} from './util.js'
 
 function getInitialState() {
   const initialTarget = target => ({target, mtime: new Time(-Infinity)})
@@ -22,6 +22,46 @@ function getInitialState() {
 }
 
 export const idleDelay = Duration.seconds(15)
+
+function timelineLowerBound(timeline, start) {
+  return lowerBound(
+    timeline,
+    start.sinceEpoch.duration,
+    ({end}) => end.sinceEpoch.duration,
+  )
+}
+
+function markTimeline(timeline, start, end) {
+  const lower = timelineLowerBound(timeline, start)
+  const upper = upperBound(
+    timeline,
+    end.sinceEpoch.duration,
+    ({start}) => start.sinceEpoch.duration,
+  )
+  if (lower < upper) {
+    const lowerStart = timeline[lower].start
+    if (lowerStart.lessThan(start)) {
+      start = lowerStart
+    }
+    const upperEnd = timeline[upper - 1].end
+    if (end.lessThan(upperEnd)) {
+      end = upperEnd
+    }
+  }
+  timeline.splice(lower, upper - lower, {start, end})
+}
+
+function clearTimeline(timeline, start) {
+  const lower = timelineLowerBound(timeline, start)
+  const items = []
+  if (lower < timeline.length) {
+    const lowerStart = timeline[lower].start
+    if (lowerStart.lessThan(start)) {
+      items.push({start: lowerStart, end: start})
+    }
+  }
+  timeline.splice(lower, timeline.length - lower, ...items)
+}
 
 export class Model {
   constructor(
@@ -59,6 +99,29 @@ export class Model {
     state.dailyValues[day] = Duration[unit](Math.max(0, value))
   }
 
+  markTimeline(peer, start, end) {
+    if (!this.state.timelines[peer]) {
+      this.state.timelines[peer] = []
+    }
+    markTimeline(this.state.timelines[peer], start, end)
+    markTimeline(this.state.sharedTimeline, start, end)
+  }
+
+  clearTimeline(peer, start) {
+    if (!this.state.timelines[peer]) {
+      return
+    }
+    clearTimeline(this.state.timelines[peer], start)
+    clearTimeline(this.state.sharedTimeline, start)
+    Object.values(this.state.timelines).map(timeline =>
+      timeline
+        .slice(timelineLowerBound(timeline, start))
+        .map(({start, end}) =>
+          markTimeline(this.state.sharedTimeline, start, end),
+        ),
+    )
+  }
+
   update(event, peer = 0) {
     const {state} = this
     if (!state) {
@@ -91,7 +154,27 @@ export class Model {
         }
       },
       idleState({time, idleState}) {
-        state.lastActives[peer] = idleState == 'active'
+        const adjustment =
+          idleState == 'idle' ? idleDelay.negate() : Duration.make(0)
+        const adjustedTime = time.plus(adjustment)
+        const {end} = state.timelines[peer]
+        this.clearTimeline(peer, adjustedTime)
+        if (state.lastActives[peer] && time.minus(end).lessThan(idleDelay)) {
+          if (end.lessThan(adjustedTime)) {
+            this.markTimeline(peer, end, adjustedTime)
+          }
+          const unit = 'milliseconds'
+          const value = Math.max(
+            adjustedTime.minus(end)[unit],
+            adjustment[unit],
+          )
+          this.addDailyValue(end, Duration[unit](value))
+        }
+        const isActive = idleState == 'active'
+        if (isActive) {
+          this.markTimeline(peer, time, time)
+        }
+        state.lastActives[peer] = isActive
       },
     })
     this.onUpdate()

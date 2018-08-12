@@ -1,13 +1,25 @@
 import {expect, test} from './test.js'
 import {
   enumerate,
+  lowerBound,
   makeExponential,
   mod,
   range,
   sha256,
   switchOnKey,
+  upperBound,
   zip,
 } from './util.js'
+
+test(() => expect(lowerBound([], 0)).toEqual(0))
+test(() => expect(lowerBound([1, 2, 3], 1)).toEqual(0))
+test(() => expect(lowerBound([1, 2, 3], 3)).toEqual(2))
+test(() => expect(lowerBound([1, 2, 3], 4)).toEqual(3))
+test(() => expect(lowerBound([1, 2], 2)).toEqual(1))
+
+test(() => expect(upperBound([1, 2], 2)).toEqual(2))
+
+test(() => expect(upperBound([2, 1], -2, x => -x)).toEqual(1))
 
 test(() => expect(enumerate('abc')).toEqual([[0, 'a'], [1, 'b'], [2, 'c']]))
 

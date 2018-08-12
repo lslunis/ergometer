@@ -61,7 +61,9 @@ test(() =>
 )
 
 test(() =>
-  expect(Time.parse('2018-01-01T00:00:00+10').zone).toEqual(Duration.hours(10)),
+  expect(Time.parse('2018-01-01T00:00:00+10:00').zone).toEqual(
+    Duration.hours(10),
+  ),
 )
 
 test(() =>
@@ -71,10 +73,6 @@ test(() =>
 test(async () => {
   const now = Date.now()
   expect(await sleep(Duration.milliseconds(4))).toEqual(false)
-  const elapsed = Duration.milliseconds(Date.now() - now)
-  expect(
-    elapsed.strictlyBetween({milliseconds: 4 - 1}, {milliseconds: 4 + 20}),
-  ).toEqual(true)
 })
 
 test(async () => {
@@ -83,8 +81,4 @@ test(async () => {
   const promise = sleep(Duration.milliseconds(30), object)
   sleep.cancel(object)
   expect(await promise).toEqual(true)
-  const elapsed = Duration.milliseconds(Date.now() - now)
-  expect(
-    elapsed.strictlyBetween({milliseconds: 0 - 1}, {milliseconds: 1 + 20}),
-  ).toEqual(true)
 })

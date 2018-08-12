@@ -5,6 +5,22 @@ export function assert(value) {
   return value
 }
 
+const binarySearchWith = compare => (xs, x, key = x => x) => {
+  let start = 0
+  let end = xs.length
+  while (start < end) {
+    const i = Math.floor((start + end) / 2)
+    if (compare(key(xs[i]), x)) {
+      start = i + 1
+    } else {
+      end = i
+    }
+  }
+  return start
+}
+export const lowerBound = binarySearchWith((a, b) => a < b)
+export const upperBound = binarySearchWith((a, b) => a <= b)
+
 export function* enumerate(it) {
   let i = 0
   for (const x of it) {

@@ -106,7 +106,7 @@ export class Duration {
 
 export class Time {
   static parse(time) {
-    const pattern = '^0000-00-00(?:T00:00:00(?:Z|([+-]00(?::00)?)))?$'
+    const pattern = '^0000-00-00(?:T00:00:00(?:Z|([+-]00:00)))?$'
     const match = time.match(RegExp(pattern.replace(/0/g, '\\d')))
     if (!match) {
       return null
@@ -118,6 +118,14 @@ export class Time {
   constructor(sinceEpoch, zone) {
     this.sinceEpoch = Duration.make(sinceEpoch)
     this.zone = zone
+  }
+
+  plus(duration) {
+    return new Time(this.sinceEpoch.plus(duration), this.zone)
+  }
+
+  minus(time) {
+    return this.sinceEpoch.minus(time.sinceEpoch)
   }
 
   lessThan(time) {
