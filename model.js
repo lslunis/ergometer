@@ -24,19 +24,15 @@ function getInitialState() {
 export const idleDelay = Duration.seconds(15)
 
 function timelineLowerBound(timeline, start) {
-  return lowerBound(
-    timeline,
-    start.sinceEpoch.duration,
-    ({end}) => end.sinceEpoch.duration,
-  )
+  return lowerBound(timeline, start.milliseconds, ({end}) => end.milliseconds)
 }
 
 function markTimeline(timeline, start, end) {
   const lower = timelineLowerBound(timeline, start)
   const upper = upperBound(
     timeline,
-    end.sinceEpoch.duration,
-    ({start}) => start.sinceEpoch.duration,
+    end.milliseconds,
+    ({start}) => start.milliseconds,
   )
   if (lower < upper) {
     const lowerStart = timeline[lower].start

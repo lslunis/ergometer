@@ -132,8 +132,12 @@ export class Time {
     return this.sinceEpoch.lessThan(time.sinceEpoch)
   }
 
+  get milliseconds() {
+    return this.sinceEpoch.milliseconds
+  }
+
   toString() {
-    return `[Time: ${this.sinceEpoch.milliseconds} ms since Unix epoch]`
+    return `[Time: ${this.milliseconds} ms since Unix epoch]`
   }
 
   valueOf() {
