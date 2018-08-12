@@ -35,14 +35,8 @@ function markTimeline(timeline, start, end) {
     ({start}) => start.milliseconds,
   )
   if (lower < upper) {
-    const lowerStart = timeline[lower].start
-    if (lowerStart.lessThan(start)) {
-      start = lowerStart
-    }
-    const upperEnd = timeline[upper - 1].end
-    if (end.lessThan(upperEnd)) {
-      end = upperEnd
-    }
+    start = start.clampHigh(timeline[lower].start)
+    end = end.clampLow(timeline[upper - 1].end)
   }
   timeline.splice(lower, upper - lower, {start, end})
 }
@@ -86,13 +80,7 @@ export class Model {
       time.sinceEpoch.plus(time.zone).minus({hours: 4}).days,
     )
     state.firstWeek = Math.min(state.firstWeek, day - mod(day - 4, 7))
-    const unit = 'milliseconds'
-    value = value[unit]
-    const oldValue = state.dailyValues[day]
-    if (oldValue) {
-      value += oldValue[unit]
-    }
-    state.dailyValues[day] = Duration[unit](Math.max(0, value))
+    state.dailyValues[day] = value.plus(state.dailyValues[day] || 0).clampLow(0)
   }
 
   markTimeline(peer, start, end) {
@@ -159,12 +147,7 @@ export class Model {
           if (end.lessThan(adjustedTime)) {
             this.markTimeline(peer, end, adjustedTime)
           }
-          const unit = 'milliseconds'
-          const value = Math.max(
-            adjustedTime.minus(end)[unit],
-            adjustment[unit],
-          )
-          this.addDailyValue(end, Duration[unit](value))
+          this.addDailyValue(end, adjustedTime.minus(end).clampLow(adjustment))
         }
         const isActive = idleState == 'active'
         if (isActive) {

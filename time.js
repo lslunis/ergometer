@@ -30,15 +30,23 @@ export class Duration {
   }
 
   plus(other) {
-    return Duration.milliseconds(this.duration + Duration.make(other).duration)
+    return new Duration(this.duration + Duration.make(other).duration)
   }
 
   minus(other) {
-    return Duration.milliseconds(this.duration - Duration.make(other).duration)
+    return new Duration(this.duration - Duration.make(other).duration)
   }
 
   times(scalar) {
-    return Duration.milliseconds(this.duration * scalar)
+    return new Duration(this.duration * scalar)
+  }
+
+  clampLow(other) {
+    return new Duration(Math.max(this.duration, other.duration))
+  }
+
+  clampHigh(other) {
+    return new Duration(Math.min(this.duration, other.duration))
   }
 
   round(unit) {
@@ -126,6 +134,14 @@ export class Time {
 
   minus(time) {
     return this.sinceEpoch.minus(time.sinceEpoch)
+  }
+
+  clampLow(other) {
+    return new Time(this.sinceEpoch.clampLow(other.sinceEpoch), this.zone)
+  }
+
+  clampHigh(other) {
+    return new Time(this.sinceEpoch.clampHigh(other.sinceEpoch), this.zone)
   }
 
   lessThan(time) {
