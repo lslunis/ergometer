@@ -1,6 +1,14 @@
 import {getOutboxInitialState, Outbox} from './outbox.js'
 import {Duration, Time} from './time.js'
-import {lowerBound, makeObject, mod, switchOnKey, upperBound} from './util.js'
+import {
+  getLast,
+  lowerBound,
+  makeObject,
+  mod,
+  range,
+  switchOnKey,
+  upperBound,
+} from './util.js'
 
 function getInitialState() {
   const initialTarget = target => ({target, mtime: new Time(-Infinity)})
@@ -22,6 +30,10 @@ function getInitialState() {
 }
 
 export const idleDelay = Duration.seconds(15)
+
+function dayOfTime(time) {
+  return Math.floor(time.sinceEpoch.plus(time.zone).minus({hours: 4}).days)
+}
 
 function timelineLowerBound(timeline, start) {
   return lowerBound(timeline, start.milliseconds, ({end}) => end.milliseconds)
@@ -74,13 +86,15 @@ export class Model {
     this.preloadQueue = null
   }
 
+  getDailyValue(day) {
+    return this.state.dailyValues[day] || Duration.make(0)
+  }
+
   addDailyValue(time, value) {
     const {state} = this
-    const day = Math.floor(
-      time.sinceEpoch.plus(time.zone).minus({hours: 4}).days,
-    )
+    const day = dayOfTime(time)
     state.firstWeek = Math.min(state.firstWeek, day - mod(day - 4, 7))
-    state.dailyValues[day] = value.plus(state.dailyValues[day] || 0).clampLow(0)
+    state.dailyValues[day] = value.plus(this.getDailyValue(day)).clampLow(0)
   }
 
   markTimeline(peer, start, end) {
@@ -160,26 +174,54 @@ export class Model {
   }
 
   getMetrics(time) {
-    const values = {
-      weekly: Duration.make(0),
-      daily: Duration.make(0),
-      session: Duration.make(0),
-      rest: Duration.make(0),
-    }
-    return makeObject(
-      Object.entries(values).map(([name, value]) => {
-        const target = this.state.targets[name].target
+    const metrics = makeObject(
+      Object.entries(this.state.targets).map(([name, {target}]) => {
         return [
           name,
           {
             name,
-            value,
             target,
             advised: true,
-            attained: !value.lessThan(target),
+            get attained() {
+              return this.value.greaterEqual(this.target)
+            },
           },
         ]
       }),
     )
+    const {weekly, daily, session, rest} = metrics
+
+    const day = dayOfTime(time)
+    weekly.value = [...range(day, day - 7, -1)]
+      .map(day => this.getDailyValue(day))
+      .reduce((a, b) => a.plus(b))
+    daily.value = this.getDailyValue(day)
+
+    const {sharedTimeline} = this.state
+    const firstSession = {end: -Infinity}
+
+    session.value = Duration.make(0)
+    for (let i = sharedTimeline.length - 1; i >= 0; i--) {
+      const {start} = sharedTimeline[i]
+      const {end: priorEnd} = i ? sharedTimeline[i - 1] : firstSession
+      if (start.minus(priorEnd).greaterEqual(rest.target)) {
+        session.value = time.minus(start).clampLow(0)
+        break
+      }
+    }
+
+    rest.value = time
+      .minus(getLast(sharedTimeline, firstSession).end)
+      .clampLow(0)
+
+    const hypotheticalActiveEfficiency = session.target
+      .minus(rest.value)
+      .dividedBy(rest.target.plus(rest.value))
+    const hypotheticalIdleEfficiency = session.value
+      .minus(rest.value)
+      .dividedBy(rest.target)
+    rest.advised = hypotheticalIdleEfficiency >= hypotheticalActiveEfficiency
+
+    return metrics
   }
 }

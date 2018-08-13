@@ -28,6 +28,10 @@ export function* enumerate(it) {
   }
 }
 
+export function getLast(xs, default_) {
+  return xs.length ? xs[xs.length - 1] : default_
+}
+
 export const makeExponential = ({x0, x1, y0, y1}) => x =>
   y0 * (y1 / y0) ** ((x - x0) / (x1 - x0))
 

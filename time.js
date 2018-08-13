@@ -29,6 +29,10 @@ export class Duration {
     this.duration = duration
   }
 
+  negate() {
+    return new Duration(-this.duration)
+  }
+
   plus(other) {
     return new Duration(this.duration + Duration.make(other).duration)
   }
@@ -41,20 +45,28 @@ export class Duration {
     return new Duration(this.duration * scalar)
   }
 
+  dividedBy(other) {
+    return this.duration / Duration.make(other).duration
+  }
+
   clampLow(other) {
-    return new Duration(Math.max(this.duration, other.duration))
+    return new Duration(Math.max(this.duration, Duration.make(other).duration))
   }
 
   clampHigh(other) {
-    return new Duration(Math.min(this.duration, other.duration))
+    return new Duration(Math.min(this.duration, Duration.make(other).duration))
   }
 
   round(unit) {
     return Duration[unit](Math.round(this[unit]))
   }
 
-  lessThan(duration) {
-    return this.duration < Duration.make(duration).duration
+  lessThan(other) {
+    return this.duration < Duration.make(other).duration
+  }
+
+  greaterEqual(other) {
+    return !this.lessThan(other)
   }
 
   strictlyBetween(low, high) {
