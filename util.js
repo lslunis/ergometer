@@ -69,7 +69,8 @@ export function mod(dividend, divisor) {
 export function* range(...args) {
   assert(args.length)
   const [start, end, step = 1] = args.length > 1 ? args : [0, args[0]]
-  for (let i = start; i < end; i += step) {
+  const sign = assert(Math.sign(end - start))
+  for (let i = start; (end - i) * sign > 0; i += step) {
     yield i
   }
 }

@@ -45,6 +45,7 @@ test(() => expect(() => range().next()).toReject())
 test(() => expect(range(2)).toEqual([0, 1]))
 test(() => expect(range(1, 3)).toEqual([1, 2]))
 test(() => expect(range(2, 8, 2)).toEqual([2, 4, 6]))
+test(() => expect(range(4, 2, -1)).toEqual([4, 3]))
 
 test(async () =>
   expect(await sha256('')).toEqual(
