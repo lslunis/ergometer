@@ -66,6 +66,14 @@ export class Duration {
     return this.duration < Duration.make(other).duration
   }
 
+  lessEqual(other) {
+    return this.duration <= Duration.make(other).duration
+  }
+
+  greaterThan(other) {
+    return !this.lessEqual(other)
+  }
+
   greaterEqual(other) {
     return !this.lessThan(other)
   }
@@ -166,6 +174,18 @@ export class Time {
 
   lessThan(time) {
     return this.sinceEpoch.lessThan(time.sinceEpoch)
+  }
+
+  lessEqual(time) {
+    return this.sinceEpoch.lessEqual(time.sinceEpoch)
+  }
+
+  greaterThan(time) {
+    return this.sinceEpoch.greaterThan(time.sinceEpoch)
+  }
+
+  greaterEqual(time) {
+    return this.sinceEpoch.greaterEqual(time.sinceEpoch)
   }
 
   get milliseconds() {
