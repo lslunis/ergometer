@@ -1,6 +1,16 @@
 import {expect, test} from './test.js'
 import {Duration, sleep, Time} from './time.js'
 
+test(() => expect(() => new Duration('garbage')).toReject())
+
+test(() =>
+  expect(JSON.stringify(Duration.make(Infinity))).toEqual(
+    '{"duration":"Infinity"}',
+  ),
+)
+
+test(() => expect(new Duration('Infinity')).toEqual(Duration.make(Infinity)))
+
 test(() => expect(Duration.weeks(1).hours).toEqual(168))
 test(() => expect(Duration.days(1).minutes).toEqual(1440))
 test(() => expect(Duration.hours(1).seconds).toEqual(3600))

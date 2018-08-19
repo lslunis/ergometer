@@ -26,7 +26,8 @@ export class Duration {
   }
 
   constructor(duration) {
-    this.duration = duration
+    this.duration = +duration
+    assert(!Number.isNaN(this.duration))
   }
 
   negate() {
@@ -83,6 +84,13 @@ export class Duration {
       return '' + value
     })
     return values.map((v, i) => (!i ? v : v.padStart(2, 0))).join(':')
+  }
+
+  toJSON() {
+    const {duration} = this
+    return {
+      duration: Number.isFinite(duration) ? duration : '' + duration,
+    }
   }
 
   toString() {
