@@ -29,8 +29,6 @@ function getInitialState() {
   }
 }
 
-export const idleDelay = Duration.seconds(15)
-
 function dayOfTime(time) {
   return Math.floor(time.sinceEpoch.plus(time.zone).minus({hours: 4}).days)
 }
@@ -55,33 +53,52 @@ function markTimeline(timeline, start, end) {
 
 function clearTimeline(timeline, start) {
   const lower = timelineLowerBound(timeline, start)
-  const items = []
+  let cleared = Duration.sum(
+    timeline.slice(lower).map(({start, end}) => end.minus(start)),
+  )
+  const newSpans = []
   if (lower < timeline.length) {
     const lowerStart = timeline[lower].start
-    if (lowerStart.lessThan(start)) {
-      items.push({start: lowerStart, end: start})
+    if (lowerStart.lessEqual(start)) {
+      newSpans.push({start: lowerStart, end: start})
+      cleared = cleared.minus(start.minus(lowerStart))
     }
   }
-  timeline.splice(lower, timeline.length - lower, ...items)
+  timeline.splice(lower, timeline.length - lower, ...newSpans)
+  return cleared
+}
+
+export function restAdvised({session, rest}) {
+  const restBenefit = session.value.dividedBy(session.target) * 0.75
+  const restCost = rest.target.minus(rest.value).dividedBy(rest.target) - 0.25
+  return !rest.attained && restBenefit >= restCost
+}
+
+export class Metric {
+  constructor({name, value = null, target}) {
+    this.name = name
+    this.value = value
+    this.target = target
+    this.advised = true
+  }
+
+  get attained() {
+    return this.value.greaterEqual(this.target)
+  }
 }
 
 export class Model {
-  constructor(
-    time,
-    state,
-    {verbose = false, onUpdate = () => {}, onPush} = {},
-  ) {
-    this.verbose = verbose
-    this.onUpdate = onUpdate
+  constructor(time, state, config) {
+    Object.assign(this, config)
     this.preloadQueue = []
     this.outbox = this.state = null
-    this.loaded = this.load(state, onPush)
+    this.loaded = this.load(state)
     this.update({time, started: true})
   }
 
-  async load(state, onPush) {
+  async load(state) {
     this.state = {...getInitialState(), ...((await state) || {})}
-    this.outbox = new Outbox(this.state.outbox, onPush)
+    this.outbox = new Outbox(this.state.outbox, this.onPush)
     this.preloadQueue.map(f => f())
     this.preloadQueue = null
   }
@@ -107,9 +124,9 @@ export class Model {
 
   clearTimeline(peer, start) {
     if (!this.state.timelines[peer]) {
-      return
+      return Duration.make(0)
     }
-    clearTimeline(this.state.timelines[peer], start)
+    const cleared = clearTimeline(this.state.timelines[peer], start)
     clearTimeline(this.state.sharedTimeline, start)
     Object.values(this.state.timelines).map(timeline =>
       timeline
@@ -118,6 +135,15 @@ export class Model {
           markTimeline(this.state.sharedTimeline, start, end),
         ),
     )
+    return cleared
+  }
+
+  periodsSinceActive(time, peer = 0) {
+    return this.state.lastActives[peer]
+      ? time
+          .minus(getLast(this.state.timelines[peer]).end)
+          .dividedBy(this.keepActivePeriod)
+      : Infinity
   }
 
   update(event, peer = 0) {
@@ -151,18 +177,23 @@ export class Model {
           t.target = target
         }
       },
-      idleState({time, idleState}) {
+      idleState: ({time, idleState}) => {
         const adjustment =
-          idleState == 'idle' ? idleDelay.negate() : Duration.make(0)
+          idleState == 'idle' ? this.idleDelay.negate() : Duration.make(0)
         const adjustedTime = time.plus(adjustment)
-        const {end} = state.timelines[peer]
-        this.clearTimeline(peer, adjustedTime)
-        if (state.lastActives[peer] && time.minus(end).lessThan(idleDelay)) {
-          if (end.lessThan(adjustedTime)) {
+        let delta = Duration.make(0)
+        if (this.periodsSinceActive(time, peer) < 1) {
+          const {end} = getLast(state.timelines[peer])
+          const markDelta = adjustedTime.minus(end)
+          if (markDelta.greaterThan(0)) {
             this.markTimeline(peer, end, adjustedTime)
+            delta = delta.plus(markDelta)
           }
-          this.addDailyValue(end, adjustedTime.minus(end).clampLow(adjustment))
         }
+        delta = delta
+          .minus(this.clearTimeline(peer, adjustedTime))
+          .clampLow(adjustment)
+        this.addDailyValue(time, delta)
         const isActive = idleState == 'active'
         if (isActive) {
           this.markTimeline(peer, time, time)
@@ -173,54 +204,44 @@ export class Model {
     this.onUpdate()
   }
 
+  *reversedIdleTimeline(time) {
+    for (let i = this.state.sharedTimeline.length - 1; i >= 0; i--) {
+      const {start, end} = this.state.sharedTimeline[i]
+      yield [end, time]
+      time = start
+    }
+    yield [new Time(-Infinity), time]
+  }
+
   getMetrics(time) {
     const metrics = makeObject(
       Object.entries(this.state.targets).map(([name, {target}]) => {
-        return [
-          name,
-          {
-            name,
-            target,
-            advised: true,
-            get attained() {
-              return this.value.greaterEqual(this.target)
-            },
-          },
-        ]
+        return [name, new Metric({name, target})]
       }),
     )
     const {weekly, daily, session, rest} = metrics
 
     const day = dayOfTime(time)
-    weekly.value = [...range(day, day - 7, -1)]
-      .map(day => this.getDailyValue(day))
-      .reduce((a, b) => a.plus(b))
+    weekly.value = Duration.sum(
+      [...range(day, day - 7, -1)].map(day => this.getDailyValue(day)),
+    )
     daily.value = this.getDailyValue(day)
 
-    const {sharedTimeline} = this.state
-    const firstSession = {end: -Infinity}
-
-    session.value = Duration.make(0)
-    for (let i = sharedTimeline.length - 1; i >= 0; i--) {
-      const {start} = sharedTimeline[i]
-      const {end: priorEnd} = i ? sharedTimeline[i - 1] : firstSession
-      if (start.minus(priorEnd).greaterEqual(rest.target)) {
-        session.value = time.minus(start).clampLow(0)
+    if (this.periodsSinceActive(time) < 1) {
+      rest.value = Duration.make(0)
+    }
+    for (const [start, end] of this.reversedIdleTimeline(time)) {
+      const span = end.minus(start)
+      if (!rest.value) {
+        rest.value = span.clampLow(0)
+      }
+      if (span.greaterEqual(rest.target)) {
+        session.value = time.minus(end).clampLow(0)
         break
       }
     }
 
-    rest.value = time
-      .minus(getLast(sharedTimeline, firstSession).end)
-      .clampLow(0)
-
-    const hypotheticalActiveEfficiency = session.target
-      .minus(rest.value)
-      .dividedBy(rest.target.plus(rest.value))
-    const hypotheticalIdleEfficiency = session.value
-      .minus(rest.value)
-      .dividedBy(rest.target)
-    rest.advised = hypotheticalIdleEfficiency >= hypotheticalActiveEfficiency
+    rest.advised = restAdvised(metrics)
 
     return metrics
   }

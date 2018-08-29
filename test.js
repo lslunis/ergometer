@@ -79,6 +79,6 @@ export function test(f) {
     logError(`${failCount} tests fail`)
   }
   if (!rejectEnabled) {
-    logError('Rejection expectations were disabled')
+    logError('Rejection expectations are disabled')
   }
 })()

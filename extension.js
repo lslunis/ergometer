@@ -1,8 +1,7 @@
 import {black, colorize} from './colors.js'
-import {idleDelay, Model} from './model.js'
+import {Model} from './model.js'
 import {revive} from './reviver.js'
 import {Duration, Time, sleep} from './time.js'
-import {assert} from './util.js'
 
 function now() {
   const sinceEpoch = Duration.milliseconds(Date.now()).round('deciseconds')
@@ -46,18 +45,29 @@ function tick() {
   if (!model.state) {
     return
   }
+
+  const time = now()
   const {monitored} = model.state
-  const metrics = colorize(model.getMetrics(now()))
+  const metrics = colorize(model.getMetrics(time))
+
   setIcon({monitored})
   send('details', {monitored, metrics})
-  if (!metrics.rest.attained) {
-    ;(async () => {
-      if (await sleep(Duration.seconds(1), tick)) {
-        return
-      }
-      tick()
-    })()
+
+  const t = model.periodsSinceActive(time)
+  if (0.8 <= t && t < 1) {
+    model.update({time, idleState: 'active'})
   }
+
+  if (!metrics.rest.attained) {
+    scheduleTick()
+  }
+}
+
+async function scheduleTick() {
+  if (await sleep(Duration.seconds(1), tick)) {
+    return
+  }
+  tick()
 }
 
 async function load() {
@@ -70,6 +80,8 @@ let meanStoreLatency = 0
 let maxStoreLatency = 0
 const model = new Model(now(), load(), {
   verbose: true,
+  idleDelay: Duration.seconds(15),
+  keepActivePeriod: Duration.seconds(25),
   async onUpdate() {
     tick()
     const start = performance.now()
@@ -83,6 +95,7 @@ const model = new Model(now(), load(), {
       console.log({meanStoreLatency, maxStoreLatency})
     }
   },
+  onPush() {},
 })
 model.loaded.then(tick)
 
@@ -108,9 +121,9 @@ function send(name, message) {
 }
 
 const idleStateChanged = idleState => update({idleState})
-browser.idle.setDetectionInterval(idleDelay.seconds)
+browser.idle.setDetectionInterval(model.idleDelay.seconds)
 browser.idle.onStateChanged.addListener(idleStateChanged)
-browser.idle.queryState(idleDelay.seconds).then(idleStateChanged)
+browser.idle.queryState(model.idleDelay.seconds).then(idleStateChanged)
 
 let errorCount = 0
 function handleError(error) {

@@ -1,9 +1,15 @@
-import {Model} from './model.js'
+import {Model, restAdvised, Metric} from './model.js'
 import {expect, test} from './test.js'
 import {Duration, Time} from './time.js'
+import {makeObject} from './util.js'
 
-async function loadModel(state) {
-  const model = new Model(Time.parse('1970-01-01'), state)
+async function loadModel() {
+  const model = new Model(Time.parse('1970-01-01'), null, {
+    idleDelay: Duration.seconds(15),
+    keepActivePeriod: Duration.seconds(25),
+    onUpdate() {},
+    onPush() {},
+  })
   await model.loaded
   return model
 }
@@ -46,55 +52,95 @@ test(async () => {
   expectTarget().toEqual(2)
 })
 
-test(async () => {
+function updateIdleState(m, updates) {
+  updates.map(args => {
+    const [string, peer] = typeof args == 'string' ? [args] : args
+    const [time, idleState] = string.split(' ')
+    m.update({time: Time.parse(time), idleState}, peer)
+  })
+}
+
+async function testDailyValue() {
   const m = await loadModel()
-  const addDailyValue = (time, value) =>
-    m.addDailyValue(Time.parse(time), Duration.seconds(value))
-  const expectDailyValue = day => expect(m.state.dailyValues[day].seconds)
+  return {
+    m,
+    addDailyValue(time, value) {
+      m.addDailyValue(Time.parse(time), Duration.seconds(value))
+    },
+    updateIdleState(...updates) {
+      updateIdleState(m, updates)
+    },
+    expectDailyValue(day) {
+      return expect(m.state.dailyValues[day].seconds)
+    },
+  }
+}
 
-  addDailyValue('1970-01-01', 3)
-  expectDailyValue(-1).toEqual(3)
-  addDailyValue('1970-01-01', 2)
-  expectDailyValue(-1).toEqual(5)
-  addDailyValue('1970-01-01', -1)
-  expectDailyValue(-1).toEqual(4)
-  addDailyValue('1970-01-01', -5)
-  expectDailyValue(-1).toEqual(0)
-
-  addDailyValue('1970-01-02', -1)
+test(async () => {
+  const {addDailyValue, expectDailyValue} = await testDailyValue()
+  addDailyValue('1970-01-01T12:00:00Z', 3)
+  expectDailyValue(0).toEqual(3)
+  addDailyValue('1970-01-01T12:00:00Z', 2)
+  expectDailyValue(0).toEqual(5)
+  addDailyValue('1970-01-01T12:00:00Z', -1)
+  expectDailyValue(0).toEqual(4)
+  addDailyValue('1970-01-01T12:00:00Z', -5)
   expectDailyValue(0).toEqual(0)
-
-  addDailyValue('1970-02-01T03:59:59Z', 12)
-  expectDailyValue(30).toEqual(12)
-  addDailyValue('1970-02-01T04:00:00Z', 17)
-  expectDailyValue(31).toEqual(17)
-
-  addDailyValue('1970-03-01T03:59:59+01:00', 14)
-  expectDailyValue(58).toEqual(14)
-  addDailyValue('1970-03-01T04:00:00+01:00', 18)
-  expectDailyValue(59).toEqual(18)
 })
 
 test(async () => {
-  const m = await loadModel()
-  const addDailyValue = (time, value) =>
-    m.addDailyValue(Time.parse(time), Duration.seconds(value))
+  const {addDailyValue, expectDailyValue} = await testDailyValue()
+  addDailyValue('1970-01-01T12:00:00Z', -1)
+  expectDailyValue(0).toEqual(0)
+})
 
-  addDailyValue('1970-01-05T12:00:00Z', 3)
+test(async () => {
+  const {addDailyValue, expectDailyValue} = await testDailyValue()
+  addDailyValue('1970-01-01T03:59:59Z', 2)
+  expectDailyValue(-1).toEqual(2)
+  addDailyValue('1970-01-01T04:00:00Z', 3)
+  expectDailyValue(0).toEqual(3)
+})
+
+test(async () => {
+  const {addDailyValue, expectDailyValue} = await testDailyValue()
+  addDailyValue('1970-01-01T03:59:59+01:00', 4)
+  expectDailyValue(-1).toEqual(4)
+  addDailyValue('1970-01-01T04:00:00+01:00', 2)
+  expectDailyValue(0).toEqual(2)
+})
+
+test(async () => {
+  const {m, addDailyValue} = await testDailyValue()
+  addDailyValue('1970-01-05T12:00:00Z', 10)
   expect(m.state.firstWeek).toEqual(4)
-  addDailyValue('1970-02-01T12:00:00Z', 5)
+  addDailyValue('1970-02-01T12:00:00Z', 20)
   expect(m.state.firstWeek).toEqual(4)
-  addDailyValue('1970-01-01T12:00:00Z', 2)
+  addDailyValue('1970-01-01T12:00:00Z', 30)
   expect(m.state.firstWeek).toEqual(-3)
 })
 
 test(async () => {
+  const {updateIdleState, expectDailyValue} = await testDailyValue()
+  updateIdleState(
+    '1970-01-01T03:00:00Z active',
+    '1970-01-01T04:00:10+01:00 active',
+  )
+  expectDailyValue(0).toEqual(10)
+})
+
+test(async () => {
+  const {updateIdleState, expectDailyValue} = await testDailyValue()
+  updateIdleState(
+    '1970-01-01T04:00:00+01:00 active',
+    '1970-01-01T03:00:10Z active',
+  )
+  expectDailyValue(-1).toEqual(10)
+})
+
+async function testTimeline() {
   const m = await loadModel()
   const secondsSinceEpoch = seconds => new Time({seconds})
-  const markTimeline = (peer, start, end) =>
-    m.markTimeline(peer, secondsSinceEpoch(start), secondsSinceEpoch(end))
-  const clearTimeline = (peer, start) =>
-    m.clearTimeline(peer, secondsSinceEpoch(start))
   const expectTimelineSeconds = timeline =>
     expect(
       timeline.map(({start, end}) => [
@@ -102,9 +148,29 @@ test(async () => {
         end.sinceEpoch.seconds,
       ]),
     )
-  const expectTimeline = peer => expectTimelineSeconds(m.state.timelines[peer])
-  const expectSharedTimeline = () =>
-    expectTimelineSeconds(m.state.sharedTimeline)
+  return {
+    markTimeline(peer, start, end) {
+      m.markTimeline(peer, secondsSinceEpoch(start), secondsSinceEpoch(end))
+    },
+    clearTimeline(peer, start) {
+      return m.clearTimeline(peer, secondsSinceEpoch(start)).seconds
+    },
+    expectTimeline(peer) {
+      return expectTimelineSeconds(m.state.timelines[peer])
+    },
+    expectSharedTimeline() {
+      return expectTimelineSeconds(m.state.sharedTimeline)
+    },
+  }
+}
+
+test(async () => {
+  const {
+    markTimeline,
+    clearTimeline,
+    expectTimeline,
+    expectSharedTimeline,
+  } = await testTimeline()
   const thisPeer = 0
   const otherPeer = 1
 
@@ -120,11 +186,163 @@ test(async () => {
   expectTimeline(thisPeer).toEqual([[1, 3]])
   expectSharedTimeline().toEqual([[1, 4]])
 
-  clearTimeline(thisPeer, 2)
+  expect(clearTimeline(thisPeer, 2)).toEqual(1)
   expectTimeline(thisPeer).toEqual([[1, 2]])
   expectSharedTimeline().toEqual([[1, 2], [3, 4]])
 
   markTimeline(thisPeer, 0, 3)
   expectTimeline(thisPeer).toEqual([[0, 3]])
   expectSharedTimeline().toEqual([[0, 4]])
+
+  expect(clearTimeline(thisPeer, 0)).toEqual(3)
+  expectTimeline(thisPeer).toEqual([[0, 0]])
+
+  markTimeline(thisPeer, 1, 2)
+  markTimeline(thisPeer, 4, 6)
+  markTimeline(thisPeer, 8, 11)
+  expect(clearTimeline(thisPeer, 5)).toEqual(4)
+})
+
+async function testMetrics(...names) {
+  const m = await loadModel()
+  m.update({
+    time: Time.parse('1970-01-01'),
+    name: 'rest',
+    target: Duration.minutes(1),
+  })
+  return {
+    updateIdleState(...updates) {
+      updateIdleState(m, updates)
+    },
+    expectValues(time) {
+      return expect(
+        makeObject(
+          Object.values(m.getMetrics(Time.parse(time)))
+            .filter(({name}) => names.includes(name))
+            .map(({name, value}) => [name, value.seconds]),
+        ),
+      )
+    },
+  }
+}
+
+test(async () => {
+  const {updateIdleState, expectValues} = await testMetrics('weekly', 'daily')
+  updateIdleState(
+    '1970-01-01T12:00:00Z active',
+    '1970-01-01T12:00:10Z locked',
+    '1970-01-07T12:00:00Z active',
+    '1970-01-07T12:00:20Z locked',
+  )
+
+  expectValues('1970-01-01T03:59:59Z').toEqual({weekly: 0, daily: 0})
+  expectValues('1970-01-02T03:59:59Z').toEqual({weekly: 10, daily: 10})
+  expectValues('1970-01-02T04:00:00Z').toEqual({weekly: 10, daily: 0})
+
+  expectValues('1970-01-08T03:59:59Z').toEqual({weekly: 30, daily: 20})
+  expectValues('1970-01-08T04:00:00Z').toEqual({weekly: 20, daily: 0})
+
+  expectValues('1970-01-14T04:00:00Z').toEqual({weekly: 0, daily: 0})
+})
+
+test(async () => {
+  const {updateIdleState, expectValues} = await testMetrics(
+    'daily',
+    'session',
+    'rest',
+  )
+  const otherPeer = 1
+  expectValues('1970-01-01T12:00:00Z').toEqual({
+    daily: 0,
+    session: 0,
+    rest: Infinity,
+  })
+
+  updateIdleState('1970-01-01T12:00:00Z active', '1970-01-01T12:00:20Z active')
+  expectValues('1970-01-01T12:00:25Z').toEqual({
+    daily: 20,
+    session: 25,
+    rest: 0,
+  })
+
+  updateIdleState('1970-01-01T12:00:30Z idle')
+  expectValues('1970-01-01T12:01:14Z').toEqual({
+    daily: 15,
+    session: 74,
+    rest: 59,
+  })
+  expectValues('1970-01-01T12:01:15Z').toEqual({
+    daily: 15,
+    session: 0,
+    rest: 60,
+  })
+
+  updateIdleState(
+    '1970-01-01T12:01:15Z active',
+    ['1970-01-01T12:01:20Z active', otherPeer],
+    ['1970-01-01T12:01:25Z locked', otherPeer],
+    '1970-01-01T12:01:40Z active',
+  )
+  expectValues('1970-01-01T12:01:40Z').toEqual({
+    daily: 20,
+    session: 25,
+    rest: 0,
+  })
+
+  updateIdleState('1970-01-01T12:03:00Z active', '1970-01-01T12:03:00Z locked')
+  expectValues('1970-01-01T12:02:55Z').toEqual({
+    daily: 20,
+    session: 0,
+    rest: 0,
+  })
+  expectValues('1970-01-01T12:03:05Z').toEqual({
+    daily: 20,
+    session: 5,
+    rest: 5,
+  })
+
+  updateIdleState('1970-01-01T12:03:10Z active', '1970-01-01T12:03:10Z idle')
+  expectValues('1970-01-01T12:03:10Z').toEqual({
+    daily: 20,
+    session: 0,
+    rest: 90,
+  })
+
+  updateIdleState('1970-01-01T12:03:15Z active', '1970-01-01T12:03:10Z active')
+  expectValues('1970-01-01T12:03:15Z').toEqual({
+    daily: 20,
+    session: 5,
+    rest: 0,
+  })
+})
+
+test(async () => {
+  const expectRestAdvised = metrics =>
+    expect(
+      restAdvised(
+        makeObject(
+          Object.entries(metrics).map(([name, value]) => {
+            return [
+              name,
+              new Metric({
+                name,
+                value: Duration.minutes(value),
+                target: Duration.minutes(1),
+              }),
+            ]
+          }),
+        ),
+      ),
+    )
+
+  expectRestAdvised({session: 0, rest: 1}).toEqual(false)
+
+  expectRestAdvised({session: 0, rest: 0.74}).toEqual(false)
+  expectRestAdvised({session: 0, rest: 0.75}).toEqual(true)
+
+  expectRestAdvised({session: 0.49, rest: 0.375}).toEqual(false)
+  expectRestAdvised({session: 0.5, rest: 0.375}).toEqual(true)
+
+  expectRestAdvised({session: 0.99, rest: 0}).toEqual(false)
+  expectRestAdvised({session: 1, rest: 0}).toEqual(true)
 })
