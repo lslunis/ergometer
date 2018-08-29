@@ -40,7 +40,13 @@ async function flash(closeAfter) {
   }
 }
 
+let ticking
+
 function tick() {
+  if (ticking) {
+    return
+  }
+  ticking = true
   sleep.cancel(tick)
   if (!model.state) {
     return
@@ -61,6 +67,7 @@ function tick() {
   if (!metrics.rest.attained) {
     scheduleTick()
   }
+  ticking = false
 }
 
 async function scheduleTick() {
