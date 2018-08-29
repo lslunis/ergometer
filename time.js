@@ -3,6 +3,10 @@ import {assert, makePromise} from './util.js'
 const unitToFactor = new Map()
 
 export class Duration {
+  static sum(durations) {
+    return durations.reduce((a, b) => a.plus(b), Duration.make(0))
+  }
+
   static parse(duration) {
     const match = duration.match(/^([+-]?)(\d+)(?::(\d\d))?$/)
     if (!match) {

@@ -1,6 +1,11 @@
 import {expect, test} from './test.js'
 import {Duration, sleep, Time} from './time.js'
 
+test(() => expect(Duration.sum([]).days).toEqual(0))
+test(() =>
+  expect(Duration.sum([Duration.days(1), {hours: 2}]).hours).toEqual(26),
+)
+
 test(() => expect(() => new Duration('garbage')).toReject())
 
 test(() =>
