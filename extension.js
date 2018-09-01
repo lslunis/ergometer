@@ -16,9 +16,9 @@ function setIcon(data) {
   })
 }
 
-async function flash(closeAfter) {
+async function flash(name, closeAfter = Duration.seconds(0.5), fragment = '') {
   const {id} = await browser.windows.create({
-    url: 'flash.html',
+    url: `${name}.html#${fragment}`,
     type: 'popup',
     state: 'fullscreen',
   })
@@ -33,6 +33,8 @@ async function flash(closeAfter) {
 }
 
 let ticking
+let wasMonitored
+let lastFlashed
 
 function tick() {
   if (ticking) {
@@ -47,8 +49,23 @@ function tick() {
   const time = now()
   const {monitored} = model.state
   const metrics = colorize(model.getMetrics(time))
+  const {session, rest} = metrics
   const advisedMetrics = Object.values(metrics).filter(m => m.advised)
   setIcon({monitored, metrics: advisedMetrics})
+  if (monitored) {
+    // todo: flash if attained
+  } else {
+    if (wasMonitored) {
+      lastFlashed = time.minus(rest.target)
+    }
+    if (
+      time.minus(lastFlashed).greaterEqual(session.target.plus(rest.target))
+    ) {
+      flash('unmonitored')
+      lastFlashed = time
+    }
+  }
+  wasMonitored = monitored
   send('details', {monitored, metrics})
 
   const t = model.periodsSinceActive(time)
@@ -56,7 +73,7 @@ function tick() {
     model.update({time, idleState: 'active'})
   }
 
-  if (!metrics.rest.attained) {
+  if (!rest.attained) {
     scheduleTick()
   }
   ticking = false

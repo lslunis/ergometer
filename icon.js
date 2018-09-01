@@ -7,9 +7,11 @@ export function getIcon(
 ) {
   const scale = devicePixelRatio
   const size = unscaledSize * scale
-  const c = document.createElement('canvas').getContext('2d')
+  const canvas = document.createElement('canvas')
+  canvas.width = canvas.height = size
+  const c = canvas.getContext('2d')
   if (!monitored) {
-    const rect = (...args) => c.fillRect(...args.map(i => i * scale))
+    const rect = (...args) => c.fillRect(...args.map(i => (i / 16) * size))
     c.fillStyle = black
     rect(4, 4, 3, 8)
     rect(9, 4, 3, 8)
@@ -24,7 +26,7 @@ export function getIcon(
     c.strokeStyle = m.color
     c.stroke()
   })
-  let result = c
+  let result = canvas
   if (asImageData) {
     result = c.getImageData(0, 0, size, size)
   }
