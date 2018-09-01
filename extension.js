@@ -1,7 +1,8 @@
-import {black, colorize} from './colors.js'
+import {colorize} from './colors.js'
 import {Model} from './model.js'
 import {revive} from './reviver.js'
 import {Duration, Time, sleep} from './time.js'
+import {getIcon} from './icon.js'
 
 function now() {
   const sinceEpoch = Duration.milliseconds(Date.now()).round('deciseconds')
@@ -9,18 +10,9 @@ function now() {
   return new Time(sinceEpoch, zone)
 }
 
-function setIcon({monitored}) {
-  const scale = devicePixelRatio
-  const size = 16 * scale
-  const c = document.createElement('canvas').getContext('2d')
-  if (!monitored) {
-    const rect = (...args) => c.fillRect(...args.map(i => i * scale))
-    c.fillStyle = black
-    rect(4, 4, 3, 8)
-    rect(9, 4, 3, 8)
-  }
+function setIcon(data) {
   return browser.browserAction.setIcon({
-    imageData: c.getImageData(0, 0, size, size),
+    imageData: getIcon(16, data, {asImageData: true}),
   })
 }
 
