@@ -1,4 +1,4 @@
-import {assert, makePromise} from './util.js'
+import {assert, getLast, makePromise, zip} from './util.js'
 
 const unitToFactor = new Map()
 
@@ -86,18 +86,6 @@ export class Duration {
     return Duration.make(low).lessThan(this) && this.lessThan(high)
   }
 
-  format(...units) {
-    // TODO: negative, infinity
-    units = ['hours', 'minutes', ...units]
-    let remainder = this
-    const values = units.map(unit => {
-      const value = Math.floor(remainder[unit])
-      remainder = remainder.minus({[unit]: value})
-      return '' + value
-    })
-    return values.map((v, i) => (!i ? v : v.padStart(2, 0))).join(':')
-  }
-
   toJSON() {
     const {duration} = this
     return {
@@ -105,8 +93,31 @@ export class Duration {
     }
   }
 
-  toString() {
-    return `[Duration: ${this.milliseconds} ms]`
+  toString(format = 'h:mm:ss.') {
+    if (!Number.isFinite(this.milliseconds)) {
+      return `Duration(${this.milliseconds})`
+    }
+    const paddings = []
+    format.replace(/\w+/g, s => paddings.push(s.length))
+    const units = ['hours', 'minutes', 'seconds'].slice(0, paddings.length)
+
+    const negative = this.lessThan(0)
+    let remainder = negative ? this.negate() : this
+    const values = units.map(unit => {
+      const value = Math.floor(remainder[unit])
+      remainder = remainder.minus({[unit]: value})
+      return value
+    })
+
+    let string =
+      (negative ? '-' : format.startsWith('+') ? '+' : '') +
+      [...zip(values, paddings)]
+        .map(([v, p]) => ('' + v).padStart(p, 0))
+        .join(':')
+    if (format.endsWith('.')) {
+      string += ('' + remainder[getLast(units)]).slice(1)
+    }
+    return string
   }
 
   valueOf() {
@@ -197,7 +208,14 @@ export class Time {
   }
 
   toString() {
-    return `[Time: ${this.milliseconds} ms since Unix epoch]`
+    if (!Number.isFinite(this.milliseconds)) {
+      return `Time(${this.milliseconds})`
+    }
+    return (
+      new Date(this.sinceEpoch.plus(this.zone).milliseconds)
+        .toISOString()
+        .slice(0, -1) + this.zone.toString('+hh:mm')
+    )
   }
 
   valueOf() {

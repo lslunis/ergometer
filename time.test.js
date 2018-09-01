@@ -58,10 +58,17 @@ test(() =>
   ),
 )
 
-test(() => expect(Duration.make(0).format()).toEqual('0:00'))
-test(() => expect(Duration.seconds(1000).format()).toEqual('0:16'))
-test(() => expect(Duration.seconds(1000).format('seconds')).toEqual('0:16:40'))
-test(() => expect(Duration.weeks(1).format()).toEqual('168:00'))
+test(() =>
+  expect(Duration.make(Infinity).toString()).toEqual('Duration(Infinity)'),
+)
+test(() => expect(Duration.make(0).toString('h:mm')).toEqual('0:00'))
+test(() => expect(Duration.seconds(1000).toString('h:mm')).toEqual('0:16'))
+test(() =>
+  expect(Duration.seconds(1000).toString('h:mm:ss')).toEqual('0:16:40'),
+)
+test(() => expect(Duration.weeks(1).toString('h:mm')).toEqual('168:00'))
+test(() => expect(Duration.minutes(70).toString('+hh:mm')).toEqual('+01:10'))
+test(() => expect(Duration.seconds(72).toString('h:mm.')).toEqual('0:01.2'))
 
 test(() => expect(Time.parse('')).toEqual(null))
 
@@ -97,3 +104,9 @@ test(async () => {
   sleep.cancel(object)
   expect(await promise).toEqual(true)
 })
+
+test(() =>
+  expect(Time.parse('2018-01-01').toString()).toEqual(
+    '2018-01-01T00:00:00.000+00:00',
+  ),
+)

@@ -128,8 +128,8 @@ function* getMetricCells({monitored, metrics}) {
     yield* [
       new Label(name),
       new TextField(name),
-      new Text(value.format('seconds'), color),
-      new Text(target.format()),
+      new Text(value.toString('h:mm:ss'), color),
+      new Text(target.toString('h:mm')),
     ]
   }
 }
