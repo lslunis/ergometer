@@ -32,9 +32,24 @@ async function flash(name, closeAfter = Duration.seconds(0.5), fragment = '') {
   }
 }
 
+let wasMonitored = true
+let lastUnmonitoredFlashed
+
+function maybeFlashUnmonitored(time, monitored, {session, rest}) {
+  if (!monitored) {
+    if (wasMonitored) {
+      lastUnmonitoredFlashed = time.minus(rest.target)
+    }
+    const period = session.target.plus(rest.target)
+    if (time.minus(lastUnmonitoredFlashed).greaterEqual(period)) {
+      flash('unmonitored')
+      lastUnmonitoredFlashed = time
+    }
+  }
+  wasMonitored = monitored
+}
+
 let ticking
-let wasMonitored
-let lastFlashed
 
 function tick() {
   if (ticking) {
@@ -49,23 +64,10 @@ function tick() {
   const time = now()
   const {monitored} = model.state
   const metrics = colorize(model.getMetrics(time))
-  const {session, rest} = metrics
   const advisedMetrics = Object.values(metrics).filter(m => m.advised)
   setIcon({monitored, metrics: advisedMetrics})
-  if (monitored) {
-    // todo: flash if attained
-  } else {
-    if (wasMonitored) {
-      lastFlashed = time.minus(rest.target)
-    }
-    if (
-      time.minus(lastFlashed).greaterEqual(session.target.plus(rest.target))
-    ) {
-      flash('unmonitored')
-      lastFlashed = time
-    }
-  }
-  wasMonitored = monitored
+
+  maybeFlashUnmonitored(time, monitored, metrics)
   send('details', {monitored, metrics})
 
   const t = model.periodsSinceActive(time)
@@ -73,7 +75,7 @@ function tick() {
     model.update({time, idleState: 'active'})
   }
 
-  if (!rest.attained) {
+  if (!metrics.rest.attained) {
     scheduleTick()
   }
   ticking = false
