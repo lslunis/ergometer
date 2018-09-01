@@ -152,9 +152,9 @@ export class Model {
       this.preloadQueue.push(() => this.update(event, peer))
       return
     }
-    if (this.verbose) {
-      console.log({...event, peer})
-    }
+    const log = this.verbose
+      ? message => console.log(`${event.time} <${peer}> ${message}`)
+      : () => {}
     if (!peer) {
       this.outbox.push(event)
     }
@@ -165,19 +165,26 @@ export class Model {
     }
     switchOnKey(event, {
       started({started}) {
+        log('started')
         setMonitored(started)
       },
       monitored({monitored}) {
+        log(monitored ? 'monitored' : 'unmonitored')
         setMonitored(monitored)
       },
       target({time, name, target}) {
+        let message = `${name} target = ${target}`
         const t = state.targets[name]
         if (t.mtime.lessThan(time)) {
           t.mtime = time
           t.target = target
+        } else {
+          message += ` -- overwritten at ${t.mtime}`
         }
+        log(message)
       },
       idleState: ({time, idleState}) => {
+        log(idleState)
         const adjustment =
           idleState == 'idle' ? this.idleDelay.negate() : Duration.make(0)
         const adjustedTime = time.plus(adjustment)
