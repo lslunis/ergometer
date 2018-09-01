@@ -47,8 +47,8 @@ function tick() {
   const time = now()
   const {monitored} = model.state
   const metrics = colorize(model.getMetrics(time))
-
-  setIcon({monitored})
+  const advisedMetrics = Object.values(metrics).filter(m => m.advised)
+  setIcon({monitored, metrics: advisedMetrics})
   send('details', {monitored, metrics})
 
   const t = model.periodsSinceActive(time)

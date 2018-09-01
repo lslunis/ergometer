@@ -1,7 +1,12 @@
 import {black} from './colors.js'
 
-export function getIcon(size, {monitored}, {asImageData = false} = {}) {
+export function getIcon(
+  unscaledSize,
+  {monitored, metrics = []},
+  {asImageData = false} = {},
+) {
   const scale = devicePixelRatio
+  const size = unscaledSize * scale
   const c = document.createElement('canvas').getContext('2d')
   if (!monitored) {
     const rect = (...args) => c.fillRect(...args.map(i => i * scale))
@@ -9,10 +14,19 @@ export function getIcon(size, {monitored}, {asImageData = false} = {}) {
     rect(4, 4, 3, 8)
     rect(9, 4, 3, 8)
   }
+  metrics.map((m, i) => {
+    const startAngle = -0.5 * Math.PI
+    const endAngle = m.value.dividedBy(m.target) * 2 * Math.PI + startAngle
+    const center = size / 2
+    const radius = (size / 2) * (1 - 0.25 * i)
+    c.beginPath()
+    c.arc(center, center, radius, startAngle, endAngle)
+    c.strokeStyle = m.color
+    c.stroke()
+  })
   let result = c
   if (asImageData) {
-    const pixelSize = size * scale
-    result = c.getImageData(0, 0, pixelSize, pixelSize)
+    result = c.getImageData(0, 0, size, size)
   }
   return result
 }
