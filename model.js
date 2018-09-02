@@ -85,6 +85,10 @@ export class Metric {
   get attained() {
     return this.value.greaterEqual(this.target)
   }
+
+  get ratio() {
+    return this.value.dividedBy(this.target)
+  }
 }
 
 export class Model {

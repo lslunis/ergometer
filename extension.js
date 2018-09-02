@@ -58,11 +58,11 @@ function maybeFlashAttained(time, monitored, metrics) {
   if (!monitored || !metrics.some(m => m.attained)) {
     return
   }
-  const exhaustionOf = m => m.value / m.target
+  const exhaustionOf = m => m.ratio
   const m = maxBy(metrics, exhaustionOf)
   const exhaustion = exhaustionOf(m)
   const limit = 16 / 15
-  const minOpenAfter = idleDelay.plus({seconds: 5})
+  const minOpenAfter = model.idleDelay.plus({seconds: 5})
   const openAfter = Duration.seconds(
     makeExponential(
       1,
