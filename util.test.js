@@ -3,6 +3,7 @@ import {
   enumerate,
   lowerBound,
   makeExponential,
+  maxBy,
   mod,
   range,
   sha256,
@@ -29,6 +30,14 @@ test(() => {
   expect(exp2(2)).toEqual(4)
   expect(exp2(10)).toEqual(1024)
 })
+
+test(() => expect(() => maxBy([], x => x)).toReject())
+test(() => expect(maxBy([11], x => x)).toEqual(11))
+test(() => expect(maxBy([11, 22], x => x)).toEqual(22))
+test(() => expect(maxBy([22, 11], x => x)).toEqual(22))
+test(() => expect(maxBy([11, 22, 11], x => x)).toEqual(22))
+test(() => expect(maxBy([11, 22, 22], x => x)).toEqual(22))
+test(() => expect(maxBy([11, 22], x => -x)).toEqual(11))
 
 test(() => expect(mod(5, 5)).toEqual(0))
 test(() => expect(mod(2, 5)).toEqual(2))

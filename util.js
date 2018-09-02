@@ -58,6 +58,17 @@ export function* map(it, f) {
   }
 }
 
+export function maxBy(xs, key) {
+  assert(xs.length)
+  let max = xs[0]
+  for (const x of xs) {
+    if (key(x) > key(max)) {
+      max = x
+    }
+  }
+  return max
+}
+
 export function mod(dividend, divisor) {
   let remainder = dividend % divisor
   if (remainder && Math.sign(dividend) != Math.sign(divisor)) {
