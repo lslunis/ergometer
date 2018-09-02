@@ -71,7 +71,7 @@ function clearTimeline(timeline, start) {
 export function restAdvised({session, rest}) {
   const restBenefit = session.value.dividedBy(session.target) * 0.75
   const restCost = rest.target.minus(rest.value).dividedBy(rest.target) - 0.25
-  return !rest.attained && restBenefit >= restCost
+  return !rest.attained && rest.ratio && restBenefit >= restCost
 }
 
 export class Metric {
