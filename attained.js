@@ -1,4 +1,19 @@
-const [_, color, value] = location.hash.match(/^#([0-9a-f]{6}),(\d\d?\.\d)$/i)
-const {body} = document
-body.style.backgroundColor = '#' + color
-body.textContent = value
+let colors = location.hash
+  .slice(1)
+  .split(',')
+  .map(c => `#${c}`)
+
+browser.runtime
+  .connect(
+    null,
+    {name: 'attained'},
+  )
+  .onMessage.addListener(cs => (colors = cs))
+
+function draw() {
+  document.body.style.background =
+    colors[Math.floor(Math.random() * colors.length)]
+}
+
+draw()
+setInterval(draw, 250)

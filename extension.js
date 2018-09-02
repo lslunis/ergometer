@@ -3,6 +3,7 @@ import {Model} from './model.js'
 import {revive} from './reviver.js'
 import {Duration, Time, sleep} from './time.js'
 import {getIcon} from './icon.js'
+import {makeExponential, maxBy} from './util.js'
 
 function now() {
   const sinceEpoch = Duration.milliseconds(Date.now()).round('deciseconds')
@@ -16,7 +17,9 @@ function setIcon(data) {
   })
 }
 
-async function flash(name, closeAfter = Duration.seconds(0.5), fragment = '') {
+const minCloseAfter = Duration.seconds(0.5)
+
+async function flash(name, closeAfter = minCloseAfter, fragment = '') {
   const {id} = await browser.windows.create({
     url: `${name}.html#${fragment}`,
     type: 'popup',
@@ -33,20 +36,51 @@ async function flash(name, closeAfter = Duration.seconds(0.5), fragment = '') {
 }
 
 let wasMonitored = true
-let lastUnmonitoredFlashed
+let lastFlashUnmonitored
 
 function maybeFlashUnmonitored(time, monitored, {session, rest}) {
   if (!monitored) {
     if (wasMonitored) {
-      lastUnmonitoredFlashed = time.minus(rest.target)
+      lastFlashUnmonitored = time.minus(rest.target)
     }
-    const period = session.target.plus(rest.target)
-    if (time.minus(lastUnmonitoredFlashed).greaterEqual(period)) {
+    const openAfter = session.target.plus(rest.target)
+    if (time.minus(lastFlashUnmonitored).greaterEqual(openAfter)) {
       flash('unmonitored')
-      lastUnmonitoredFlashed = time
+      lastFlashUnmonitored = time
     }
   }
   wasMonitored = monitored
+}
+
+let lastFlashAttained = Duration.make(-Infinity)
+
+function maybeFlashAttained(time, monitored, metrics) {
+  if (!monitored || !metrics.some(m => m.attained)) {
+    return
+  }
+  const exhaustionOf = m => m.value / m.target
+  const m = maxBy(metrics, exhaustionOf)
+  const exhaustion = exhaustionOf(m)
+  const limit = 16 / 15
+  const minOpenAfter = idleDelay.plus({seconds: 5})
+  const openAfter = Duration.seconds(
+    makeExponential(
+      1,
+      limit,
+      m.target.clampLow(minOpenAfter).seconds,
+      minOpenAfter.seconds,
+    )(exhaustion),
+  )
+  const closeAfter = Duration.seconds(
+    makeExponential(1, limit, minCloseAfter.seconds, 10)(exhaustion),
+  )
+  const colors = metrics.map(m => m.color)
+  if (time.minus(lastFlashAttained).greaterEqual(openAfter)) {
+    flash('attained', closeAfter, colors.map(c => c.slice(1)).join(','))
+    lastFlashAttained = time
+  } else {
+    send('attained', colors)
+  }
 }
 
 let ticking
@@ -66,7 +100,7 @@ function tick() {
   const metrics = colorize(model.getMetrics(time))
   const advisedMetrics = Object.values(metrics).filter(m => m.advised)
   setIcon({monitored, metrics: advisedMetrics})
-
+  maybeFlashAttained(time, monitored, advisedMetrics)
   maybeFlashUnmonitored(time, monitored, metrics)
   send('details', {monitored, metrics})
 
