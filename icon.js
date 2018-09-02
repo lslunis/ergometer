@@ -18,7 +18,7 @@ export function getIcon(
     const fin = 1 / 30
     c.beginPath()
     c.moveTo(mid, mid)
-    c.arc(mid, mid, mid, (angle - fin) * tau, (angle + fin) * tau)
+    c.arc(mid, mid, mid, (angle - fin - 0.25) * tau, (angle + fin - 0.25) * tau)
     c.closePath()
     c.fillStyle = m.color
     c.fill()
