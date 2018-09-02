@@ -67,7 +67,7 @@ function maybeFlashAttained(time, monitored, metrics) {
     makeExponential(
       1,
       limit,
-      m.target.clampLow(minOpenAfter).seconds,
+      m.target.dividedByScalar(60).clampLow(minOpenAfter).seconds,
       minOpenAfter.seconds,
     )(exhaustion),
   )

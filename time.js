@@ -54,6 +54,10 @@ export class Duration {
     return this.duration / Duration.make(other).duration
   }
 
+  dividedByScalar(scalar) {
+    return new Duration(this.duration / scalar)
+  }
+
   clampLow(other) {
     return new Duration(Math.max(this.duration, Duration.make(other).duration))
   }
