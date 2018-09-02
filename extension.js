@@ -52,7 +52,7 @@ function maybeFlashUnmonitored(time, monitored, {session, rest}) {
   wasMonitored = monitored
 }
 
-let lastFlashAttained = Duration.make(-Infinity)
+let lastFlashAttained = new Time(-Infinity)
 
 function maybeFlashAttained(time, monitored, metrics) {
   if (!monitored || !metrics.some(m => m.attained)) {
@@ -62,17 +62,20 @@ function maybeFlashAttained(time, monitored, metrics) {
   const m = maxBy(metrics, exhaustionOf)
   const exhaustion = exhaustionOf(m)
   const limit = 16 / 15
+
+  const interpolate = (start, end) =>
+    Duration.seconds(
+      makeExponential(1, limit, start.seconds, end.seconds)(exhaustion),
+    )
+
   const minOpenAfter = model.idleDelay.plus({seconds: 5})
-  const openAfter = Duration.seconds(
-    makeExponential(
-      1,
-      limit,
-      m.target.dividedByScalar(60).clampLow(minOpenAfter).seconds,
-      minOpenAfter.seconds,
-    )(exhaustion),
-  )
-  const closeAfter = Duration.seconds(
-    makeExponential(1, limit, minCloseAfter.seconds, 10)(exhaustion),
+  const openAfter = interpolate(
+    m.target.dividedByScalar(60).clampLow(minOpenAfter),
+    minOpenAfter,
+  ).clampLow(minOpenAfter)
+  const maxCloseAfter = Duration.seconds(10)
+  const closeAfter = interpolate(minCloseAfter, maxCloseAfter).clampHigh(
+    maxCloseAfter,
   )
   const colors = metrics.map(m => m.color)
   if (time.minus(lastFlashAttained).greaterEqual(openAfter)) {
