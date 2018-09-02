@@ -125,11 +125,12 @@ class Text {
 function* getMetricCells({monitored, metrics}) {
   yield* [new Label('monitored'), new Checkbox('monitored', monitored)]
   for (const {name, value, color, target} of Object.values(metrics)) {
+    const format = 'h:mm:ss'
     yield* [
       new Label(name),
       new TextField(name),
-      new Text(value.toString('h:mm:ss'), color),
-      new Text(target.toString('h:mm')),
+      new Text(value.toString(format), color),
+      new Text(target.toString(format)),
     ]
   }
 }
