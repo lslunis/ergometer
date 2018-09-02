@@ -25,7 +25,7 @@ test(() => expect(upperBound([2, 1], -2, x => -x)).toEqual(1))
 test(() => expect(enumerate('abc')).toEqual([[0, 'a'], [1, 'b'], [2, 'c']]))
 
 test(() => {
-  const exp2 = makeExponential({x0: 0, x1: 1, y0: 1, y1: 2})
+  const exp2 = makeExponential(0, 1, 1, 2)
   expect(exp2(-1)).toEqual(0.5)
   expect(exp2(2)).toEqual(4)
   expect(exp2(10)).toEqual(1024)
