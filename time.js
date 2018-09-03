@@ -170,7 +170,7 @@ export class Time {
     return new Time({milliseconds: Date.parse(time)}, Duration.parse(zone))
   }
 
-  constructor(sinceEpoch, zone) {
+  constructor(sinceEpoch, zone = Duration.make(0)) {
     this.sinceEpoch = Duration.make(sinceEpoch)
     this.zone = zone
   }

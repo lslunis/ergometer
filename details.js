@@ -1,7 +1,7 @@
 import {black, white} from './colors.js'
 import {revive} from './reviver.js'
-import {Duration} from './time.js'
-import {assert, zip} from './util.js'
+import {Duration, Time} from './time.js'
+import {assert, map, range, zip} from './util.js'
 
 function setColors({style}, color, background) {
   if (color && style.color != color) {
@@ -122,6 +122,27 @@ class Text {
   }
 }
 
+function getHistoryRow(...cells) {
+  return cells.map(c => new Text(c))
+}
+
+function* getHistoryCells({firstWeek, dailyValues}) {
+  if (!Number.isFinite(firstWeek)) {
+    return
+  }
+
+  yield* getHistoryRow(...'Week All Mon Tue Wed Thu Fri Sat Sun'.split(' '))
+  const today = Math.floor(Duration.milliseconds(Date.now()).days)
+  for (let week = firstWeek; week <= today; week += 7) {
+    const header = new Time(Duration.days(week)).toString().slice(0, 10)
+    const days = [
+      ...map(range(week, week + 7), d => dailyValues[d] || Duration.make(0)),
+    ]
+    const sum = Duration.sum(days).toString('h:mm')
+    yield* getHistoryRow(header, sum, ...days.map(d => d.toString('h:mm')))
+  }
+}
+
 function* getMetricCells({monitored, metrics}) {
   yield* [new Label('monitored'), new Checkbox('monitored', monitored)]
   for (const {name, value, color, target} of Object.values(metrics)) {
@@ -135,15 +156,36 @@ function* getMetricCells({monitored, metrics}) {
   }
 }
 
+let firstDraw = true
+let priorFirstWeek
+
 function draw(message) {
-  const metricGrid = document.getElementById('metrics')
-  const metricNodes = metricGrid.children
-  for (const [cell, node] of zip(getMetricCells(message), metricNodes)) {
-    assert(cell)
-    if (node) {
-      cell.update(node)
-    } else {
-      metricGrid.appendChild(cell.create())
+  const drawGrid = (id, getCells) => {
+    const grid = document.getElementById(id)
+    for (const [cell, node] of zip(getCells(message), grid.children)) {
+      assert(cell)
+      if (node) {
+        cell.update(node)
+      } else {
+        grid.appendChild(cell.create())
+      }
     }
+  }
+
+  const {firstWeek} = message
+  if (priorFirstWeek && firstWeek < priorFirstWeek) {
+    const node = document.getElementById('history')
+    while (node.hasChildNodes()) {
+      node.removeChild(node.lastChild)
+    }
+  }
+  priorFirstWeek = firstWeek
+
+  drawGrid('history', getHistoryCells)
+  drawGrid('metrics', getMetricCells)
+
+  if (firstDraw) {
+    scrollTo(0, document.body.scrollHeight)
+    firstDraw = false
   }
 }

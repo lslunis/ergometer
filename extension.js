@@ -99,13 +99,13 @@ function tick() {
   }
 
   const time = now()
-  const {monitored} = model.state
+  const {monitored, firstWeek, dailyValues} = model.state
   const metrics = colorize(model.getMetrics(time))
   const advisedMetrics = Object.values(metrics).filter(m => m.advised)
   setIcon({monitored, metrics: advisedMetrics})
   maybeFlashAttained(time, monitored, advisedMetrics)
   maybeFlashUnmonitored(time, monitored, metrics)
-  send('details', {monitored, metrics})
+  send('details', {monitored, metrics, firstWeek, dailyValues})
 
   const t = model.periodsSinceActive(time)
   if (0.8 <= t && t < 1) {

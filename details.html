@@ -4,11 +4,18 @@
     font: 14px Consolas, monospace;
   }
 
-  #metrics {
+  .grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
     justify-items: end;
     grid-gap: 0.5em 1em;
+  }
+
+  #history {
+    grid-template-columns: repeat(9, 1fr);
+  }
+
+  #metrics {
+    grid-template-columns: repeat(4, 1fr);
   }
 
   #monitored {
@@ -26,4 +33,5 @@
 </style>
 <script src=browser-polyfill.js></script>
 <script type=module src=details.js></script>
-<div id=metrics></div>
+<div id=history class=grid></div>
+<div id=metrics class=grid></div>
