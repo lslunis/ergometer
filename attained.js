@@ -8,7 +8,7 @@ browser.runtime
     null,
     {name: 'attained'},
   )
-  .onMessage.addListener(cs => (colors = cs))
+  .onMessage.addListener(cs => (colors = JSON.parse(cs)))
 
 function draw() {
   document.body.style.background =
