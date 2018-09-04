@@ -142,7 +142,6 @@ let maxStoreLatency = 0
 const model = new Model(now(), load(), {
   verbose: true,
   idleDelay: Duration.seconds(15),
-  keepActivePeriod: Duration.seconds(25),
   async onUpdate() {
     tick()
     const start = performance.now()

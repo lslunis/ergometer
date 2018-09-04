@@ -6,7 +6,6 @@ import {makeObject} from './util.js'
 async function loadModel() {
   const model = new Model(Time.parse('1970-01-01'), null, {
     idleDelay: Duration.seconds(15),
-    keepActivePeriod: Duration.seconds(25),
     onUpdate() {},
     onPush() {},
   })
@@ -230,17 +229,17 @@ test(async () => {
   const {updateIdleState, expectValues} = await testMetrics('weekly', 'daily')
   updateIdleState(
     '1970-01-01T12:00:00Z active',
-    '1970-01-01T12:00:10Z locked',
+    '1970-01-01T12:00:05Z locked',
     '1970-01-07T12:00:00Z active',
-    '1970-01-07T12:00:20Z locked',
+    '1970-01-07T12:00:10Z locked',
   )
 
   expectValues('1970-01-01T03:59:59Z').toEqual({weekly: 0, daily: 0})
-  expectValues('1970-01-02T03:59:59Z').toEqual({weekly: 10, daily: 10})
-  expectValues('1970-01-02T04:00:00Z').toEqual({weekly: 10, daily: 0})
+  expectValues('1970-01-02T03:59:59Z').toEqual({weekly: 5, daily: 5})
+  expectValues('1970-01-02T04:00:00Z').toEqual({weekly: 5, daily: 0})
 
-  expectValues('1970-01-08T03:59:59Z').toEqual({weekly: 30, daily: 20})
-  expectValues('1970-01-08T04:00:00Z').toEqual({weekly: 20, daily: 0})
+  expectValues('1970-01-08T03:59:59Z').toEqual({weekly: 15, daily: 10})
+  expectValues('1970-01-08T04:00:00Z').toEqual({weekly: 10, daily: 0})
 
   expectValues('1970-01-14T04:00:00Z').toEqual({weekly: 0, daily: 0})
 })
@@ -258,21 +257,21 @@ test(async () => {
     rest: Infinity,
   })
 
-  updateIdleState('1970-01-01T12:00:00Z active', '1970-01-01T12:00:20Z active')
-  expectValues('1970-01-01T12:00:25Z').toEqual({
-    daily: 20,
-    session: 25,
+  updateIdleState('1970-01-01T12:00:00Z active', '1970-01-01T12:00:10Z active')
+  expectValues('1970-01-01T12:00:15Z').toEqual({
+    daily: 10,
+    session: 15,
     rest: 0,
   })
 
-  updateIdleState('1970-01-01T12:00:30Z idle')
-  expectValues('1970-01-01T12:01:14Z').toEqual({
-    daily: 15,
-    session: 74,
+  updateIdleState('1970-01-01T12:00:20Z idle')
+  expectValues('1970-01-01T12:01:04Z').toEqual({
+    daily: 5,
+    session: 64,
     rest: 59,
   })
-  expectValues('1970-01-01T12:01:15Z').toEqual({
-    daily: 15,
+  expectValues('1970-01-01T12:01:05Z').toEqual({
+    daily: 5,
     session: 0,
     rest: 60,
   })
@@ -281,36 +280,36 @@ test(async () => {
     '1970-01-01T12:01:15Z active',
     ['1970-01-01T12:01:20Z active', otherPeer],
     ['1970-01-01T12:01:25Z locked', otherPeer],
-    '1970-01-01T12:01:40Z active',
+    '1970-01-01T12:01:30Z active',
   )
-  expectValues('1970-01-01T12:01:40Z').toEqual({
-    daily: 20,
-    session: 25,
+  expectValues('1970-01-01T12:01:30Z').toEqual({
+    daily: 10,
+    session: 15,
     rest: 0,
   })
 
   updateIdleState('1970-01-01T12:03:00Z active', '1970-01-01T12:03:00Z locked')
   expectValues('1970-01-01T12:02:55Z').toEqual({
-    daily: 20,
+    daily: 10,
     session: 0,
     rest: 0,
   })
   expectValues('1970-01-01T12:03:05Z').toEqual({
-    daily: 20,
+    daily: 10,
     session: 5,
     rest: 5,
   })
 
   updateIdleState('1970-01-01T12:03:10Z active', '1970-01-01T12:03:10Z idle')
   expectValues('1970-01-01T12:03:10Z').toEqual({
-    daily: 20,
+    daily: 10,
     session: 0,
-    rest: 90,
+    rest: 100,
   })
 
   updateIdleState('1970-01-01T12:03:15Z active', '1970-01-01T12:03:10Z active')
   expectValues('1970-01-01T12:03:15Z').toEqual({
-    daily: 20,
+    daily: 10,
     session: 5,
     rest: 0,
   })
@@ -343,6 +342,8 @@ test(async () => {
   expectRestAdvised({session: 0.49, rest: 0.375}).toEqual(false)
   expectRestAdvised({session: 0.5, rest: 0.375}).toEqual(true)
 
-  expectRestAdvised({session: 0.99, rest: 0}).toEqual(false)
-  expectRestAdvised({session: 1, rest: 0}).toEqual(true)
+  expectRestAdvised({session: 0.99, rest: 0.001}).toEqual(false)
+  expectRestAdvised({session: 1, rest: 0.01}).toEqual(true)
+
+  expectRestAdvised({session: 1, rest: 0}).toEqual(false)
 })
