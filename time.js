@@ -179,8 +179,10 @@ export class Time {
     return new Time(this.sinceEpoch.plus(duration), this.zone)
   }
 
-  minus(time) {
-    return this.sinceEpoch.minus(time.sinceEpoch)
+  minus(value) {
+    return value instanceof Time
+      ? this.sinceEpoch.minus(value.sinceEpoch)
+      : new Time(this.sinceEpoch.minus(value), this.zone)
   }
 
   clampLow(other) {
