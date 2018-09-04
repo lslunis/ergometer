@@ -2,6 +2,7 @@
 <style>
   * {
     font: 14px Consolas, monospace;
+    white-space: nowrap;
   }
 
   .grid {
@@ -14,7 +15,13 @@
     grid-template-columns: repeat(9, 1fr);
   }
 
+  .metrics-c {
+    text-align: center;
+  }
+
   #metrics {
+    margin: 2em 0 0;
+    display: inline-grid;
     grid-template-columns: repeat(4, 1fr);
   }
 
@@ -24,7 +31,7 @@
   }
 
   input[type=text] {
-    width: 7ch;
+    width: 9ch;
   }
 
   :invalid {
@@ -34,4 +41,6 @@
 <script src=browser-polyfill.js></script>
 <script type=module src=details.js></script>
 <div id=history class=grid></div>
-<div id=metrics class=grid></div>
+<div class=metrics-c>
+  <div id=metrics class=grid></div>
+</div>
