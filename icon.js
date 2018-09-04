@@ -7,28 +7,29 @@ export function getIcon(
 ) {
   const scale = devicePixelRatio
   const size = unscaledSize * scale
+  const mid = size / 2
   const canvas = document.createElement('canvas')
   canvas.width = canvas.height = size
   const c = canvas.getContext('2d')
 
-  metrics.map(m => {
+  const cone = (radius, start, end, color) => {
     const tau = 2 * Math.PI
-    const mid = size / 2
-    const angle = m.ratio
-    const fin = 1 / 30
     c.beginPath()
     c.moveTo(mid, mid)
-    c.arc(mid, mid, mid, (angle - fin - 0.25) * tau, (angle + fin - 0.25) * tau)
+    c.arc(mid, mid, radius, start * tau, end * tau)
     c.closePath()
-    c.fillStyle = m.color
+    c.fillStyle = color
     c.fill()
+  }
+
+  metrics.map(m => {
+    const angle = m.ratio
+    const fin = 1 / 30
+    cone(mid, angle - fin - 0.25, angle + fin - 0.25, m.color)
   })
 
   if (!monitored) {
-    const rect = (...args) => c.fillRect(...args.map(i => (i / 16) * size))
-    c.fillStyle = black
-    rect(4, 4, 3, 8)
-    rect(9, 4, 3, 8)
+    cone(mid / 4, 0, 1, black)
   }
 
   let result = canvas
