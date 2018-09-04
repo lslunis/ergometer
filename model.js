@@ -75,7 +75,7 @@ export function restAdvised({session, rest}) {
 }
 
 export class Metric {
-  constructor({name, value = null, target}) {
+  constructor({name, value, target} = {}) {
     this.name = name
     this.value = value
     this.target = target

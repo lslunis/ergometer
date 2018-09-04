@@ -1,7 +1,7 @@
 import {black, white} from './colors.js'
 import {revive} from './reviver.js'
 import {Duration, Time} from './time.js'
-import {assert, map, range, zip} from './util.js'
+import {assert, map, range, removeChildren, zip} from './util.js'
 
 function setColors({style}, color, background) {
   if (color && style.color != color) {
@@ -174,10 +174,7 @@ function draw(message) {
 
   const {firstWeek} = message
   if (priorFirstWeek && firstWeek < priorFirstWeek) {
-    const node = document.getElementById('history')
-    while (node.hasChildNodes()) {
-      node.removeChild(node.lastChild)
-    }
+    removeChildren(document.getElementById('history'))
   }
   priorFirstWeek = firstWeek
 

@@ -86,6 +86,12 @@ export function* range(...args) {
   }
 }
 
+export function removeChildren(node) {
+  while (node.hasChildNodes()) {
+    node.removeChild(node.lastChild)
+  }
+}
+
 export async function sha256(s) {
   const data = new TextEncoder().encode(s)
   const digest = await crypto.subtle.digest('SHA-256', data)

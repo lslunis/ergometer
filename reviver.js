@@ -1,3 +1,4 @@
+import {Metric} from './model.js'
 import {Duration, Time} from './time.js'
 
 export async function revive(string) {
@@ -12,6 +13,9 @@ export async function revive(string) {
       }
       if ('sinceEpoch' in value) {
         return new Time(value.sinceEpoch, value.zone)
+      }
+      if ('advised' in value) {
+        return Object.assign(new Metric(), value)
       }
     }
     return value
