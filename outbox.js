@@ -7,7 +7,6 @@ export function getOutboxInitialState() {
     sendStarts: {
       broadcast: 0,
       store: 0,
-      archive: 0,
     },
   }
 }

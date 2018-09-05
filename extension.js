@@ -75,12 +75,13 @@ function maybeFlashAttained(time, monitored, metrics) {
       makeExponential(1, limit, start.seconds, end.seconds)(exhaustion),
     )
 
-  const minOpenAfter = model.idleDelay.plus({seconds: 5})
+  const maxCloseAfter = model.idleDelay
+  const minOpenAfter = maxCloseAfter.plus({seconds: 10})
+
   const openAfter = interpolate(
     m.target.dividedByScalar(60).clampLow(minOpenAfter),
     minOpenAfter,
   ).clampLow(minOpenAfter)
-  const maxCloseAfter = Duration.seconds(10)
   const closeAfter = interpolate(minCloseAfter, maxCloseAfter).clampHigh(
     maxCloseAfter,
   )
