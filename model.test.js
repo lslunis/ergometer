@@ -210,6 +210,7 @@ async function testMetrics(...names) {
     target: Duration.minutes(1),
   })
   return {
+    m,
     updateIdleState(...updates) {
       updateIdleState(m, updates)
     },
@@ -312,6 +313,23 @@ test(async () => {
     daily: 10,
     session: 5,
     rest: 0,
+  })
+})
+
+test(async () => {
+  const {m, updateIdleState, expectValues} = await testMetrics(
+    'daily',
+    'session',
+    'rest',
+  )
+  updateIdleState('1970-01-01T12:00:00Z active')
+  m.update({monitored: false})
+  updateIdleState('1970-01-01T12:00:05Z active')
+  updateIdleState('1970-01-01T12:00:20Z active')
+  expectValues('1970-01-01T12:00:20Z').toEqual({
+    daily: 0,
+    session: 20,
+    rest: 20,
   })
 })
 

@@ -188,7 +188,11 @@ export class Model {
         log(message)
       },
       idleState: ({time, idleState}) => {
-        log(idleState)
+        const {monitored} = state
+        log(`${idleState}${monitored ? '' : ' (unmonitored)'}`)
+        if (!monitored) {
+          return
+        }
         const adjustment =
           idleState == 'idle' ? this.idleDelay.negate() : Duration.make(0)
         const adjustedTime = time.plus(adjustment)
