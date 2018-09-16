@@ -6,9 +6,9 @@ import {Duration, Time, sleep} from './time.js'
 import {makeExponential, maxBy} from './util.js'
 
 function now() {
-  const sinceEpoch = Duration.milliseconds(Date.now()).round('deciseconds')
-  const zone = Duration.minutes(-new Date().getTimezoneOffset())
-  return new Time(sinceEpoch, zone)
+  const time = Time.now()
+  const sinceEpoch = time.sinceEpoch.round('deciseconds')
+  return new Time(sinceEpoch, time.zone)
 }
 
 function setIcon(data) {
