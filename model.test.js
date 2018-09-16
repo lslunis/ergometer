@@ -23,12 +23,12 @@ test(async () => {
 })
 
 test(async () => {
-  const otherPeer = 1
+  const otherHost = 1
   const m = await loadModel()
   m.update({monitored: false})
-  m.update({started: true}, otherPeer)
+  m.update({started: true}, otherHost)
   expect(m.state.monitored).toEqual(false)
-  m.update({monitored: true}, otherPeer)
+  m.update({monitored: true}, otherHost)
   expect(m.state.monitored).toEqual(false)
 })
 
@@ -53,9 +53,9 @@ test(async () => {
 
 function updateIdleState(m, updates) {
   updates.map(args => {
-    const [string, peer] = typeof args == 'string' ? [args] : args
+    const [string, host] = typeof args == 'string' ? [args] : args
     const [time, idleState] = string.split(' ')
-    m.update({time: Time.parse(time), idleState}, peer)
+    m.update({time: Time.parse(time), idleState}, host)
   })
 }
 
@@ -148,14 +148,14 @@ async function testTimeline() {
       ]),
     )
   return {
-    markTimeline(peer, start, end) {
-      m.markTimeline(peer, secondsSinceEpoch(start), secondsSinceEpoch(end))
+    markTimeline(host, start, end) {
+      m.markTimeline(host, secondsSinceEpoch(start), secondsSinceEpoch(end))
     },
-    clearTimeline(peer, start) {
-      return m.clearTimeline(peer, secondsSinceEpoch(start)).seconds
+    clearTimeline(host, start) {
+      return m.clearTimeline(host, secondsSinceEpoch(start)).seconds
     },
-    expectTimeline(peer) {
-      return expectTimelineSeconds(m.state.timelines[peer])
+    expectTimeline(host) {
+      return expectTimelineSeconds(m.state.timelines[host])
     },
     expectSharedTimeline() {
       return expectTimelineSeconds(m.state.sharedTimeline)
@@ -170,36 +170,36 @@ test(async () => {
     expectTimeline,
     expectSharedTimeline,
   } = await testTimeline()
-  const thisPeer = 0
-  const otherPeer = 1
+  const thisHost = 0
+  const otherHost = 1
 
-  markTimeline(thisPeer, 1, 2)
-  expectTimeline(thisPeer).toEqual([[1, 2]])
+  markTimeline(thisHost, 1, 2)
+  expectTimeline(thisHost).toEqual([[1, 2]])
   expectSharedTimeline().toEqual([[1, 2]])
 
-  markTimeline(otherPeer, 3, 4)
-  expectTimeline(thisPeer).toEqual([[1, 2]])
+  markTimeline(otherHost, 3, 4)
+  expectTimeline(thisHost).toEqual([[1, 2]])
   expectSharedTimeline().toEqual([[1, 2], [3, 4]])
 
-  markTimeline(thisPeer, 2, 3)
-  expectTimeline(thisPeer).toEqual([[1, 3]])
+  markTimeline(thisHost, 2, 3)
+  expectTimeline(thisHost).toEqual([[1, 3]])
   expectSharedTimeline().toEqual([[1, 4]])
 
-  expect(clearTimeline(thisPeer, 2)).toEqual(1)
-  expectTimeline(thisPeer).toEqual([[1, 2]])
+  expect(clearTimeline(thisHost, 2)).toEqual(1)
+  expectTimeline(thisHost).toEqual([[1, 2]])
   expectSharedTimeline().toEqual([[1, 2], [3, 4]])
 
-  markTimeline(thisPeer, 0, 3)
-  expectTimeline(thisPeer).toEqual([[0, 3]])
+  markTimeline(thisHost, 0, 3)
+  expectTimeline(thisHost).toEqual([[0, 3]])
   expectSharedTimeline().toEqual([[0, 4]])
 
-  expect(clearTimeline(thisPeer, 0)).toEqual(3)
-  expectTimeline(thisPeer).toEqual([[0, 0]])
+  expect(clearTimeline(thisHost, 0)).toEqual(3)
+  expectTimeline(thisHost).toEqual([[0, 0]])
 
-  markTimeline(thisPeer, 1, 2)
-  markTimeline(thisPeer, 4, 6)
-  markTimeline(thisPeer, 8, 11)
-  expect(clearTimeline(thisPeer, 5)).toEqual(4)
+  markTimeline(thisHost, 1, 2)
+  markTimeline(thisHost, 4, 6)
+  markTimeline(thisHost, 8, 11)
+  expect(clearTimeline(thisHost, 5)).toEqual(4)
 })
 
 async function testMetrics(...names) {
@@ -251,7 +251,7 @@ test(async () => {
     'session',
     'rest',
   )
-  const otherPeer = 1
+  const otherHost = 1
   expectValues('1970-01-01T12:00:00Z').toEqual({
     daily: 0,
     session: 0,
@@ -279,8 +279,8 @@ test(async () => {
 
   updateIdleState(
     '1970-01-01T12:01:15Z active',
-    ['1970-01-01T12:01:20Z active', otherPeer],
-    ['1970-01-01T12:01:25Z locked', otherPeer],
+    ['1970-01-01T12:01:20Z active', otherHost],
+    ['1970-01-01T12:01:25Z locked', otherHost],
     '1970-01-01T12:01:30Z active',
   )
   expectValues('1970-01-01T12:01:30Z').toEqual({

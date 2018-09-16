@@ -118,19 +118,19 @@ export class Model {
     state.dailyValues[day] = value.plus(this.getDailyValue(day)).clampLow(0)
   }
 
-  markTimeline(peer, start, end) {
-    if (!this.state.timelines[peer]) {
-      this.state.timelines[peer] = []
+  markTimeline(host, start, end) {
+    if (!this.state.timelines[host]) {
+      this.state.timelines[host] = []
     }
-    markTimeline(this.state.timelines[peer], start, end)
+    markTimeline(this.state.timelines[host], start, end)
     markTimeline(this.state.sharedTimeline, start, end)
   }
 
-  clearTimeline(peer, start) {
-    if (!this.state.timelines[peer]) {
+  clearTimeline(host, start) {
+    if (!this.state.timelines[host]) {
       return Duration.make(0)
     }
-    const cleared = clearTimeline(this.state.timelines[peer], start)
+    const cleared = clearTimeline(this.state.timelines[host], start)
     clearTimeline(this.state.sharedTimeline, start)
     Object.values(this.state.timelines).map(timeline =>
       timeline
@@ -142,28 +142,28 @@ export class Model {
     return cleared
   }
 
-  periodsSinceActive(time, peer = 0) {
-    return this.state.lastActives[peer]
+  periodsSinceActive(time, host = 0) {
+    return this.state.lastActives[host]
       ? time
-          .minus(getLast(this.state.timelines[peer]).end)
+          .minus(getLast(this.state.timelines[host]).end)
           .dividedBy(this.idleDelay)
       : Infinity
   }
 
-  update(event, peer = 0) {
+  update(event, host = 0) {
     const {state} = this
     if (!state) {
-      this.preloadQueue.push(() => this.update(event, peer))
+      this.preloadQueue.push(() => this.update(event, host))
       return
     }
     const log = this.verbose
-      ? message => console.log(`${event.time} <${peer}> ${message}`)
+      ? message => console.log(`${event.time} <${host}> ${message}`)
       : () => {}
-    if (!peer) {
+    if (!host) {
       this.outbox.push(event)
     }
     const setMonitored = monitored => {
-      if (!peer) {
+      if (!host) {
         state.monitored = monitored
       }
     }
@@ -197,23 +197,23 @@ export class Model {
           idleState == 'idle' ? this.idleDelay.negate() : Duration.make(0)
         const adjustedTime = time.plus(adjustment)
         let delta = Duration.make(0)
-        if (this.periodsSinceActive(time, peer) < 1) {
-          const {end} = getLast(state.timelines[peer])
+        if (this.periodsSinceActive(time, host) < 1) {
+          const {end} = getLast(state.timelines[host])
           const markDelta = adjustedTime.minus(end)
           if (markDelta.greaterThan(0)) {
-            this.markTimeline(peer, end, adjustedTime)
+            this.markTimeline(host, end, adjustedTime)
             delta = delta.plus(markDelta)
           }
         }
         delta = delta
-          .minus(this.clearTimeline(peer, adjustedTime))
+          .minus(this.clearTimeline(host, adjustedTime))
           .clampLow(adjustment)
         this.addDailyValue(time, delta)
         const isActive = idleState == 'active'
         if (isActive) {
-          this.markTimeline(peer, time, time)
+          this.markTimeline(host, time, time)
         }
-        state.lastActives[peer] = isActive
+        state.lastActives[host] = isActive
       },
     })
     this.onUpdate()
