@@ -160,6 +160,12 @@ export class Duration {
 }
 
 export class Time {
+  static now() {
+    const sinceEpoch = Duration.milliseconds(Date.now())
+    const zone = Duration.minutes(-new Date().getTimezoneOffset())
+    return new Time(sinceEpoch, zone)
+  }
+
   static parse(time) {
     const pattern = '^0000-00-00(?:T00:00:00(?:Z|([+-]00:00)))?$'
     const match = time.match(RegExp(pattern.replace(/0/g, '\\d')))
