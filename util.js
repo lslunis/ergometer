@@ -21,8 +21,7 @@ const binarySearchWith = compare => (xs, x, key = x => x) => {
 export const lowerBound = binarySearchWith((a, b) => a < b)
 export const upperBound = binarySearchWith((a, b) => a <= b)
 
-export function* enumerate(it) {
-  let i = 0
+export function* enumerate(it, i = 0) {
   for (const x of it) {
     yield [i++, x]
   }
