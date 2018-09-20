@@ -36,8 +36,8 @@ async function flash(closeAfter = minCloseAfter) {
 }
 
 let wasMonitored = true
-let lastFlashUnmonitored
 
+let lastFlashUnmonitored
 function maybeFlashUnmonitored(time, monitored, {session, rest}) {
   if (!monitored) {
     if (wasMonitored) {
@@ -49,11 +49,9 @@ function maybeFlashUnmonitored(time, monitored, {session, rest}) {
       lastFlashUnmonitored = time
     }
   }
-  wasMonitored = monitored
 }
 
 let lastFlashAttained = new Time(-Infinity)
-
 function maybeFlashAttained(time, monitored, metrics) {
   const exhaustibleMetrics = Object.values(metrics).filter(
     m => m.name != 'rest',
@@ -91,8 +89,16 @@ function maybeFlashAttained(time, monitored, metrics) {
   }
 }
 
-let ticking
+async function maybeSynthesizeActive(time, monitored) {
+  const t = model.periodsSinceActive(time)
+  const justActive = 0.8 <= t && t < 1
+  const becameMonitored = monitored && !wasMonitored
+  if (justActive || (becameMonitored && (await getIdleState()) == 'active')) {
+    model.update({time, idleState: 'active'})
+  }
+}
 
+let ticking
 function tick() {
   if (ticking) {
     return
@@ -113,15 +119,12 @@ function tick() {
   maybeFlashUnmonitored(time, monitored, metrics)
   send('flash', iconData)
   send('details', {monitored, metrics, firstWeek, dailyValues})
-
-  const t = model.periodsSinceActive(time)
-  if (0.8 <= t && t < 1) {
-    model.update({time, idleState: 'active'})
-  }
+  maybeSynthesizeActive(time, monitored)
 
   if (!metrics.rest.attained) {
     scheduleTick()
   }
+  wasMonitored = monitored
   ticking = false
 }
 
@@ -143,6 +146,9 @@ let maxStoreLatency = 0
 const model = new Model(now(), load(), {
   verbose: true,
   idleDelay: Duration.seconds(15),
+  makeConnector() {
+    return {update() {}}
+  },
   async onUpdate() {
     tick()
     const start = performance.now()
@@ -156,7 +162,6 @@ const model = new Model(now(), load(), {
       console.log({meanStoreLatency, maxStoreLatency})
     }
   },
-  onPush() {},
 })
 model.loaded.then(tick)
 
@@ -180,10 +185,14 @@ function send(name, message) {
   ports.get(name).postMessage(JSON.stringify(message))
 }
 
+function getIdleState() {
+  return browser.idle.queryState(model.idleDelay.seconds)
+}
+
 const idleStateChanged = idleState => update({idleState})
 browser.idle.setDetectionInterval(model.idleDelay.seconds)
 browser.idle.onStateChanged.addListener(idleStateChanged)
-browser.idle.queryState(model.idleDelay.seconds).then(idleStateChanged)
+getIdleState().then(idleStateChanged)
 
 let errorCount = 0
 function handleError(error) {
