@@ -32,9 +32,11 @@ export function getLast(xs, default_) {
 }
 
 export function getRandomBytes(n) {
-  return Array.from(crypto.getRandomValues(new Uint8Array(n)))
-    .map(byte => byte.toString(16).padStart(2, '0'))
-    .join('')
+  return btoa(
+    Array.from(crypto.getRandomValues(new Uint8Array(n)))
+      .map(byte => String.fromCharCode(byte))
+      .join(''),
+  ).replace(/[+/=]/g, s => ({'+': '-', '/': '_', '=': ''}[s]))
 }
 
 export const makeExponential = (x0, x1, y0, y1) => x =>
