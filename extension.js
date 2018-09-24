@@ -119,7 +119,15 @@ function tick() {
   maybeFlashAttained(time, monitored, metrics)
   maybeFlashUnmonitored(time, monitored, metrics)
   send('flash', iconData)
-  send('details', {monitored, metrics, firstWeek, dailyValues})
+  const {authenticated, user} = model.synchronizer
+  send('details', {
+    monitored,
+    metrics,
+    authenticated,
+    user,
+    firstWeek,
+    dailyValues,
+  })
   maybeSynthesizeActive(time, monitored)
 
   if (!metrics.rest.attained) {
@@ -174,7 +182,14 @@ function update(event) {
 const ports = new Map()
 browser.runtime.onConnect.addListener(port => {
   ports.set(port.name, port)
-  port.onMessage.addListener(async event => update(await revive(event)))
+  port.onMessage.addListener(async message => {
+    const event = await revive(message)
+    if ('authenticated' in event) {
+      model.synchronizer.setAuthenticated(event.authenticated)
+    } else {
+      update(event)
+    }
+  })
   port.onDisconnect.addListener(() => ports.delete(port.name))
   tick()
 })

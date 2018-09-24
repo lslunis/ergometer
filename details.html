@@ -25,13 +25,20 @@
     grid-template-columns: repeat(4, 1fr);
   }
 
-  #monitored {
-    grid-column: span 3;
+  input[type=checkbox] {
     justify-self: start;
   }
 
   input[type=text] {
     width: 9ch;
+  }
+
+  #monitored {
+    grid-column: span 3;
+  }
+
+  #user {
+    grid-column: span 2;
   }
 
   :invalid {

@@ -20,7 +20,7 @@ export class Synchronizer {
   constructor(options) {
     Object.assign(this, options)
     this.initialized = false
-    this.email = null
+    this.authenticated = false
     this.user = null
     this.hosts = new Set()
     this.unlisteners = []
@@ -28,7 +28,7 @@ export class Synchronizer {
 
     initFirebase()
     firebase.auth().onAuthStateChanged(async firebaseUser => {
-      this.setUser(firebaseUser)
+      await this.setUser(firebaseUser)
       if (!this.state.host) {
         await this.createHost()
       }
@@ -49,9 +49,9 @@ export class Synchronizer {
   }
 
   async setUser(firebaseUser) {
+    this.authenticated = !!firebaseUser
     if (firebaseUser) {
       const {email, emailVerified} = firebaseUser
-      this.email = email
       log(`signed in as ${email} ${emailVerified ? '' : '(unverified)'}`)
 
       if (emailVerified) {
@@ -73,8 +73,8 @@ export class Synchronizer {
         this.user = null
       }
     } else {
-      this.email = this.user = null
       log('signed out')
+      this.user = null
     }
   }
 

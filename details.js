@@ -51,7 +51,7 @@ class Checkbox {
     const node = document.createElement('input')
     node.id = this.name
     node.type = 'checkbox'
-    node.addEventListener('change', () => update({monitored: node.checked}))
+    node.addEventListener('change', () => update({[this.name]: node.checked}))
     this.update(node)
     return node
   }
@@ -102,14 +102,16 @@ class TextField {
 }
 
 class Text {
-  constructor(value, color, background) {
+  constructor(value, {id, color, background} = {}) {
     this.value = value
+    this.id = id
     this.color = color
     this.background = background
   }
 
   create() {
     const node = document.createElement('div')
+    node.id = this.id
     this.update(node)
     return node
   }
@@ -143,17 +145,22 @@ function* getHistoryCells({firstWeek, dailyValues}) {
   }
 }
 
-function* getMetricCells({monitored, metrics}) {
+function* getMetricCells({monitored, metrics, authenticated, user}) {
   yield* [new Label('monitored'), new Checkbox('monitored', monitored)]
   for (const {name, value, color, target} of Object.values(metrics)) {
     const format = 'h:mm:ss'
     yield* [
       new Label(name),
       new TextField(name),
-      new Text(value.toString(format), color),
+      new Text(value.toString(format), {color}),
       new Text(target.toString(format)),
     ]
   }
+  yield* [
+    new Label('authed'),
+    new Checkbox('authenticated', authenticated),
+    new Text(authenticated ? user || 'not syncing' : '', {id: 'user'}),
+  ]
 }
 
 let firstDraw = true
