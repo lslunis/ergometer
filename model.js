@@ -1,4 +1,4 @@
-import {getOutboxInitialState, Outbox} from './outbox.js'
+import {getSynchronizerInitialState} from './synchronizer.js'
 import {Duration, Time} from './time.js'
 import {
   getLast,
@@ -13,7 +13,6 @@ import {
 function getInitialState() {
   const initialTarget = target => ({target, mtime: new Time(-Infinity)})
   return {
-    outbox: getOutboxInitialState(),
     monitored: true,
     targets: {
       weekly: initialTarget(Duration.hours(40)),
@@ -26,6 +25,7 @@ function getInitialState() {
     sharedTimeline: [],
     firstWeek: Infinity,
     dailyValues: {},
+    ...getSynchronizerInitialState(),
   }
 }
 
@@ -92,17 +92,25 @@ export class Metric {
 }
 
 export class Model {
-  constructor(time, state, config) {
-    Object.assign(this, config)
+  constructor(time, state, options) {
+    Object.assign(this, options)
     this.preloadQueue = []
-    this.outbox = this.state = null
+    this.synchronizer = this.state = null
     this.loaded = this.load(state)
     this.update({time, started: true})
   }
 
   async load(state) {
     this.state = {...getInitialState(), ...((await state) || {})}
-    this.outbox = new Outbox(this.state.outbox, this.onPush)
+    this.synchronizer = this.makeSynchronizer({
+      state: this.state,
+      onStateChanged() {
+        this.onStateChanged()
+      },
+      onEvent(event) {
+        this.update(event)
+      },
+    })
     this.preloadQueue.map(f => f())
     this.preloadQueue = null
   }
@@ -150,17 +158,22 @@ export class Model {
       : Infinity
   }
 
-  update(event, host = 0) {
+  update(event) {
+    const {host = 0} = event
     const {state} = this
     if (!state) {
-      this.preloadQueue.push(() => this.update(event, host))
+      this.preloadQueue.push(() => this.update(event))
       return
     }
+    const getId = () => event.id || this.synchronizer.nextId
     const log = this.verbose
-      ? message => console.log(`${event.time} <${host}> ${message}`)
+      ? message =>
+          console.log(
+            `${event.time} <${host || 'local'} ${getId()}> ${message}`,
+          )
       : () => {}
     if (!host) {
-      this.outbox.push(event)
+      this.synchronizer.update(event)
     }
     const setMonitored = monitored => {
       if (!host) {
@@ -189,7 +202,7 @@ export class Model {
       },
       idleState: ({time, idleState}) => {
         const {monitored} = state
-        log(`${idleState}${monitored ? '' : ' (unmonitored)'}`)
+        log(`${idleState} ${monitored ? '' : '(unmonitored)'}`)
         if (!monitored) {
           return
         }
@@ -216,7 +229,7 @@ export class Model {
         state.lastActives[host] = isActive
       },
     })
-    this.onUpdate()
+    this.onStateChanged()
   }
 
   *reversedIdleTimeline(time) {

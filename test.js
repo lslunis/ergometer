@@ -55,7 +55,7 @@ export function test(f) {
   addEventListener('error', ({error}) => logError(error))
   addEventListener('unhandledrejection', ({reason}) => logError(reason))
   await Promise.all(
-    ['model', 'outbox', 'time', 'util'].map(m => import(`./${m}.test.js`)),
+    ['model', 'time', 'util'].map(m => import(`./${m}.test.js`)),
   )
   let runningCount = tests.length
   let passCount = 0

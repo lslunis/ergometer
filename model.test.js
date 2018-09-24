@@ -6,8 +6,10 @@ import {makeObject} from './util.js'
 async function loadModel() {
   const model = new Model(Time.parse('1970-01-01'), null, {
     idleDelay: Duration.seconds(15),
-    onUpdate() {},
-    onPush() {},
+    makeSynchronizer() {
+      return {onStateChanged() {}, update() {}}
+    },
+    onStateChanged() {},
   })
   await model.loaded
   return model
@@ -26,9 +28,9 @@ test(async () => {
   const otherHost = 1
   const m = await loadModel()
   m.update({monitored: false})
-  m.update({started: true}, otherHost)
+  m.update({started: true, host: otherHost})
   expect(m.state.monitored).toEqual(false)
-  m.update({monitored: true}, otherHost)
+  m.update({monitored: true, host: otherHost})
   expect(m.state.monitored).toEqual(false)
 })
 
@@ -55,7 +57,7 @@ function updateIdleState(m, updates) {
   updates.map(args => {
     const [string, host] = typeof args == 'string' ? [args] : args
     const [time, idleState] = string.split(' ')
-    m.update({time: Time.parse(time), idleState}, host)
+    m.update({time: Time.parse(time), idleState, host})
   })
 }
 

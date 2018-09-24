@@ -2,6 +2,7 @@ import {colorize} from './colors.js'
 import {getIcon} from './icon.js'
 import {Model} from './model.js'
 import {revive} from './reviver.js'
+import {Synchronizer} from './synchronizer.js'
 import {Duration, Time, sleep} from './time.js'
 import {makeExponential, maxBy} from './util.js'
 
@@ -146,10 +147,10 @@ let maxStoreLatency = 0
 const model = new Model(now(), load(), {
   verbose: true,
   idleDelay: Duration.seconds(15),
-  makeConnector() {
-    return {update() {}}
+  makeSynchronizer(options) {
+    return new Synchronizer(options)
   },
-  async onUpdate() {
+  async onStateChanged() {
     tick()
     const start = performance.now()
     await browser.storage.local.set({state: JSON.stringify(model.state)})
@@ -158,7 +159,7 @@ const model = new Model(now(), load(), {
     meanStoreLatency =
       (meanStoreLatency * (storeCount - 1) + latency) / storeCount
     maxStoreLatency = Math.max(maxStoreLatency, latency)
-    if (!(storeCount % 1000)) {
+    if (!(storeCount % 50)) {
       console.log({meanStoreLatency, maxStoreLatency})
     }
   },
