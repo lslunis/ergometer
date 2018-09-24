@@ -104,10 +104,10 @@ export class Model {
     this.state = {...getInitialState(), ...((await state) || {})}
     this.synchronizer = this.makeSynchronizer({
       state: this.state,
-      onStateChanged() {
+      onStateChanged: () => {
         this.onStateChanged()
       },
-      onEvent(event) {
+      onEvent: event => {
         this.update(event)
       },
     })
