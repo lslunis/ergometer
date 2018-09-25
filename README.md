@@ -7,6 +7,7 @@ With it, you can:
 - Configure targets (enforced by increasingly insistent reminders) for total daily activity, individual activity sessions, and rest breaks between sessions.
 - Pause or resume monitoring at any time.
 - Display historical activity.
+- Sync all activity between computers (in private beta).
 
 Download links:
 

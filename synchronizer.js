@@ -1,6 +1,6 @@
 import {initFirebase} from './config.js'
-import {Time} from './time.js'
-import {assert, enumerate, getRandomBytes} from './util.js'
+import {Duration, Time} from './time.js'
+import {assert, enumerate, getRandomBytes, makeObject} from './util.js'
 
 export function getSynchronizerInitialState() {
   return {
@@ -10,6 +10,32 @@ export function getSynchronizerInitialState() {
     },
     inboxes: {},
   }
+}
+
+function declassify(value) {
+  if (Array.isArray(value)) {
+    return value.map(declassify)
+  }
+  if (value && typeof value == 'object') {
+    return makeObject(Object.entries(value).map(([k, v]) => [k, declassify(v)]))
+  }
+  return value
+}
+
+function classify(value) {
+  if (Array.isArray(value)) {
+    return value.map(classify)
+  }
+  if (value && typeof value == 'object') {
+    if ('duration' in value) {
+      return new Duration(value.duration)
+    }
+    if ('sinceEpoch' in value) {
+      return new Time(classify(value.sinceEpoch), classify(value.zone))
+    }
+    return makeObject(Object.entries(value).map(([k, v]) => [k, classify(v)]))
+  }
+  return value
 }
 
 function log(message) {
@@ -99,7 +125,7 @@ export class Synchronizer {
       tx.update(userDocRef, {hosts})
     })
     this.state.host = host
-    log(`host created as ${host} for user ${user}`)
+    log(`host ${host} created for user ${user}`)
     this.onStateChanged()
     this.send()
   }
@@ -126,6 +152,7 @@ export class Synchronizer {
   }
 
   onNewHost(host) {
+    this.hosts.add(host)
     const {user} = this
     let nextId = this.state.inboxes[host] || 0
     log(`listening for events on user ${user}, host ${host}, id >= ${nextId}`)
@@ -142,14 +169,15 @@ export class Synchronizer {
             .docChanges()
             .filter(({type}) => type == 'added')
             .map(({doc}) => {
-              if (nextId != doc.id) {
+              const event = doc.data()
+              if (nextId != event.id) {
                 throw Error(
-                  `non-contiguous event; expected ${nextId}, got ${doc.id}`,
+                  `non-contiguous event; expected ${nextId}, got ${event.id}`,
                 )
               }
               nextId++
               this.state.inboxes[host] = nextId
-              this.onEvent(doc)
+              this.onEvent(classify(event))
             }),
         ),
     )
@@ -176,7 +204,10 @@ export class Synchronizer {
         const batchLimit = 20
         const {start} = this.state.outbox
         const events = this.state.outbox.events.slice(0, batchLimit)
-        const message = `events [${start}, ${start + events.length})`
+        const message =
+          events.length == 1
+            ? `event ${start}`
+            : `events ${start}-${start + events.length - 1}`
         log(`sending ${message}`)
         const batch = firebase.firestore().batch()
 
@@ -187,7 +218,7 @@ export class Synchronizer {
             .doc()
 
           batch.set(eventRef, {
-            ...event,
+            ...declassify(event),
             user: this.user,
             host: this.state.host,
             id,

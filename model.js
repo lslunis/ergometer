@@ -172,9 +172,6 @@ export class Model {
             `${event.time} <${host || 'local'} ${getId()}> ${message}`,
           )
       : () => {}
-    if (!host) {
-      this.synchronizer.update(event)
-    }
     const setMonitored = monitored => {
       if (!host) {
         state.monitored = monitored
@@ -229,6 +226,9 @@ export class Model {
         state.lastActives[host] = isActive
       },
     })
+    if (!host) {
+      this.synchronizer.update(event)
+    }
     this.onStateChanged()
   }
 
