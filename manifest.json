@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Ergometer",
-  "version": "5.0.2",
+  "version": "5.1",
   "permissions": ["background", "idle", "storage", "unlimitedStorage"],
   "background": {
     "page": "extension.html"
