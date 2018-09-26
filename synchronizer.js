@@ -143,9 +143,8 @@ export class Synchronizer {
         .collection('users')
         .doc(this.user)
         .onSnapshot(doc => {
-          doc
-            .data()
-            .hosts.filter(h => h != this.state.host && !this.hosts.has(h))
+          ;(doc.data().hosts || [])
+            .filter(h => h != this.state.host && !this.hosts.has(h))
             .map(h => this.onNewHost(h))
         }),
     )
