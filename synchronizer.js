@@ -153,8 +153,9 @@ export class Synchronizer {
   onNewHost(host) {
     this.hosts.add(host)
     const {user} = this
+    const prefix = `user ${user}, host ${host}`
     let nextId = this.state.inboxes[host] || 0
-    log(`listening for events on user ${user}, host ${host}, id >= ${nextId}`)
+    log(`listening for events on ${prefix}, id >= ${nextId}`)
     this.unlisteners.push(
       firebase
         .firestore()
@@ -169,10 +170,13 @@ export class Synchronizer {
             .filter(({type}) => type == 'added')
             .map(({doc}) => {
               const event = doc.data()
-              if (nextId != event.id) {
-                throw Error(
-                  `non-contiguous event; expected ${nextId}, got ${event.id}`,
-                )
+              const {id} = event
+              if (id < nextId) {
+                log(`ignoring duplicate ${prefix}, id ${id}`)
+                return
+              }
+              if (id != nextId) {
+                throw Error(`expected ${prefix}, id ${nextId}; got ${id}`)
               }
               nextId++
               this.state.inboxes[host] = nextId
