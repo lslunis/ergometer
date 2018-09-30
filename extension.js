@@ -149,9 +149,6 @@ async function load() {
   return revive(results.state)
 }
 
-let storeCount = 0
-let meanStoreLatency = 0
-let maxStoreLatency = 0
 const model = new Model(now(), load(), {
   verbose: true,
   idleDelay: Duration.seconds(15),
@@ -160,16 +157,7 @@ const model = new Model(now(), load(), {
   },
   async onStateChanged() {
     tick()
-    const start = performance.now()
     await browser.storage.local.set({state: JSON.stringify(model.state)})
-    const latency = performance.now() - start
-    storeCount++
-    meanStoreLatency =
-      (meanStoreLatency * (storeCount - 1) + latency) / storeCount
-    maxStoreLatency = Math.max(maxStoreLatency, latency)
-    if (!(storeCount % 50)) {
-      console.log({meanStoreLatency, maxStoreLatency})
-    }
   },
 })
 model.loaded.then(tick)
@@ -209,14 +197,3 @@ const idleStateChanged = idleState => update({idleState})
 browser.idle.setDetectionInterval(model.idleDelay.seconds)
 browser.idle.onStateChanged.addListener(idleStateChanged)
 getIdleState().then(idleStateChanged)
-
-let errorCount = 0
-function handleError(error) {
-  errorCount++
-  browser.browserAction.setBadgeText({text: '' + errorCount})
-  browser.browserAction.setBadgeBackgroundColor({color: 'red'})
-  throw error
-}
-
-addEventListener('error', ({error}) => handleError(error))
-addEventListener('unhandledrejection', ({reason}) => handleError(reason))
