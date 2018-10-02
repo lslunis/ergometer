@@ -90,11 +90,13 @@ function maybeFlashAttained(time, monitored, metrics) {
   }
 }
 
-async function maybeSynthesizeActive(time, monitored) {
-  const t = model.periodsSinceActive(time)
-  const justActive = 0.8 <= t && t < 1
-  const becameMonitored = monitored && !wasMonitored
-  if (justActive || (becameMonitored && (await getIdleState()) == 'active')) {
+let lastIdleStateUpdated = new Time(-Infinity)
+
+async function maybeSynthesizeActive(time) {
+  const delay = model.idleDelay.times(0.8)
+  const ready = time.minus(lastIdleStateUpdated).greaterEqual(delay)
+  if (ready && (await getIdleState()) == 'active') {
+    lastIdleStateUpdated = time
     model.update({time, idleState: 'active'})
   }
 }
@@ -128,7 +130,7 @@ function tick() {
     firstWeek,
     dailyValues,
   })
-  maybeSynthesizeActive(time, monitored)
+  maybeSynthesizeActive(time)
 
   if (!metrics.rest.attained) {
     scheduleTick()
@@ -162,11 +164,6 @@ const model = new Model(now(), load(), {
 })
 model.loaded.then(tick)
 
-function update(event) {
-  event.time = now()
-  model.update(event)
-}
-
 const ports = new Map()
 browser.runtime.onConnect.addListener(port => {
   ports.set(port.name, port)
@@ -175,7 +172,8 @@ browser.runtime.onConnect.addListener(port => {
     if ('authenticated' in event) {
       model.synchronizer.setAuthenticated(event.authenticated)
     } else {
-      update(event)
+      event.time = now()
+      model.update(event)
     }
   })
   port.onDisconnect.addListener(() => ports.delete(port.name))
@@ -193,7 +191,12 @@ function getIdleState() {
   return browser.idle.queryState(model.idleDelay.seconds)
 }
 
-const idleStateChanged = idleState => update({idleState})
+function idleStateChanged(idleState) {
+  const time = now()
+  lastIdleStateUpdated = time
+  model.update({time, idleState})
+}
+
 browser.idle.setDetectionInterval(model.idleDelay.seconds)
 browser.idle.onStateChanged.addListener(idleStateChanged)
 getIdleState().then(idleStateChanged)
