@@ -17,21 +17,23 @@ async function loadModel() {
 
 test(async () => {
   const m = await loadModel()
-  expect(m.state.monitored).toEqual(true)
+  const thisHost = 0
+  expect(m.state.monitoringStates[thisHost]).toEqual(true)
   m.update({monitored: false})
-  expect(m.state.monitored).toEqual(false)
+  expect(m.state.monitoringStates[thisHost]).toEqual(false)
   m.update({monitored: true})
-  expect(m.state.monitored).toEqual(true)
+  expect(m.state.monitoringStates[thisHost]).toEqual(true)
 })
 
 test(async () => {
+  const thisHost = 0
   const otherHost = 1
   const m = await loadModel()
   m.update({monitored: false})
   m.update({started: true, host: otherHost})
-  expect(m.state.monitored).toEqual(false)
+  expect(m.state.monitoringStates[thisHost]).toEqual(false)
   m.update({monitored: true, host: otherHost})
-  expect(m.state.monitored).toEqual(false)
+  expect(m.state.monitoringStates[thisHost]).toEqual(false)
 })
 
 test(async () => {

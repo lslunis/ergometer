@@ -93,11 +93,14 @@ function maybeFlashAttained(time, monitored, metrics) {
 let lastIdleStateUpdated = new Time(-Infinity)
 
 async function maybeSynthesizeActive(time) {
+  if ((await getIdleState()) != 'active') {
+    return
+  }
   const delay = model.idleDelay.times(0.8)
   const ready = time.minus(lastIdleStateUpdated).greaterEqual(delay)
-  if (ready && (await getIdleState()) == 'active') {
+  if (ready) {
     lastIdleStateUpdated = time
-    model.update({time, idleState: 'active'})
+    model.update({time, idleState: 'active'}, {quiet: true})
   }
 }
 
@@ -113,7 +116,8 @@ function tick() {
   }
 
   const time = now()
-  const {monitored, firstWeek, dailyValues} = model.state
+  const monitored = model.isMonitored()
+  const {firstWeek, dailyValues} = model.state
   const metrics = colorize(model.getMetrics(time))
   const advisedMetrics = Object.values(metrics).filter(m => m.advised)
   const iconData = {monitored, metrics: advisedMetrics}

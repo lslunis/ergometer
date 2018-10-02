@@ -164,7 +164,7 @@ export class Synchronizer {
         .where('host', '==', host)
         .where('id', '>=', nextId)
         .orderBy('id')
-        .onSnapshot(snapshot =>
+        .onSnapshot(snapshot => {
           snapshot
             .docChanges()
             .filter(({type}) => type == 'added')
@@ -180,9 +180,10 @@ export class Synchronizer {
               }
               nextId++
               this.state.inboxes[host] = nextId
-              this.onEvent(classify(event))
-            }),
-        ),
+              this.onEvent(classify(event), {quiet: true})
+            })
+          this.onStateChanged()
+        }),
     )
   }
 

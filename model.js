@@ -13,7 +13,7 @@ import {
 function getInitialState() {
   const initialTarget = target => ({target, mtime: new Time(-Infinity)})
   return {
-    monitored: true,
+    monitoringStates: {},
     targets: {
       weekly: initialTarget(Duration.hours(40)),
       daily: initialTarget(Duration.hours(8)),
@@ -115,6 +115,11 @@ export class Model {
     this.preloadQueue = null
   }
 
+  isMonitored(host = 0) {
+    const monitored = this.state.monitoringStates[host]
+    return monitored == null ? true : monitored
+  }
+
   getDailyValue(day) {
     return this.state.dailyValues[day] || Duration.make(0)
   }
@@ -158,7 +163,7 @@ export class Model {
       : Infinity
   }
 
-  update(event) {
+  update(event, {quiet = false} = {}) {
     const {host = 0} = event
     const {state} = this
     if (!state) {
@@ -173,9 +178,7 @@ export class Model {
           )
       : () => {}
     const setMonitored = monitored => {
-      if (!host) {
-        state.monitored = monitored
-      }
+      state.monitoringStates[host] = monitored
     }
     switchOnKey(event, {
       started({started}) {
@@ -198,7 +201,7 @@ export class Model {
         log(message)
       },
       idleState: ({time, idleState}) => {
-        const {monitored} = state
+        const monitored = this.isMonitored(host)
         log(`${idleState} ${monitored ? '' : '(unmonitored)'}`)
         if (!monitored) {
           return
@@ -229,7 +232,9 @@ export class Model {
     if (!host) {
       this.synchronizer.update(event)
     }
-    this.onStateChanged()
+    if (!quiet) {
+      this.onStateChanged()
+    }
   }
 
   *reversedIdleTimeline(time) {
