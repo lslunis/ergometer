@@ -155,9 +155,9 @@ const model = new Model(now(), load(), {
   makeSynchronizer(options) {
     return new Synchronizer(options)
   },
-  async onStateChanged() {
+  onStateChanged() {
+    browser.storage.local.set({state: JSON.stringify(model.state)})
     tick()
-    await browser.storage.local.set({state: JSON.stringify(model.state)})
   },
 })
 model.loaded.then(tick)
