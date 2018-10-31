@@ -97,7 +97,6 @@ export class Model {
     this.preloadQueue = []
     this.synchronizer = this.state = null
     this.loaded = this.load(state)
-    this.update({time, started: true})
   }
 
   async load(state) {
@@ -177,17 +176,10 @@ export class Model {
             `${event.time} <${host || 'local'} ${getId()}> ${message}`,
           )
       : () => {}
-    const setMonitored = monitored => {
-      state.monitoringStates[host] = monitored
-    }
     switchOnKey(event, {
-      started({started}) {
-        log('started')
-        setMonitored(started)
-      },
       monitored({monitored}) {
         log(monitored ? 'monitored' : 'unmonitored')
-        setMonitored(monitored)
+        state.monitoringStates[host] = monitored
       },
       target({time, name, target}) {
         let message = `${name} target = ${target}`
