@@ -29,7 +29,7 @@ function getInitialState() {
   }
 }
 
-function dayOfTime(time) {
+export function dayOfTime(time) {
   return Math.floor(time.sinceEpoch.plus(time.zone).minus({hours: 4}).days)
 }
 

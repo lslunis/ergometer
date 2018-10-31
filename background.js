@@ -1,6 +1,6 @@
 import {colorize} from './colors.js'
 import {getIcon} from './icon.js'
-import {Model} from './model.js'
+import {Model, dayOfTime} from './model.js'
 import {revive} from './reviver.js'
 import {Synchronizer} from './synchronizer.js'
 import {Duration, Time, sleep} from './time.js'
@@ -90,6 +90,15 @@ function maybeFlashAttained(time, monitored, metrics) {
   }
 }
 
+let lastDay
+function maybeSynthesizeMonitored(time) {
+  const day = dayOfTime(time)
+  if (day != lastDay) {
+    model.update({time, monitored: true}, {quiet: true})
+  }
+  lastDay = day
+}
+
 let lastIdleStateUpdated = new Time(-Infinity)
 
 async function maybeSynthesizeActive(time) {
@@ -134,6 +143,7 @@ function tick() {
     firstWeek,
     dailyValues,
   })
+  maybeSynthesizeMonitored(time)
   maybeSynthesizeActive(time)
 
   if (!metrics.rest.attained) {
