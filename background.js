@@ -18,6 +18,10 @@ function setIcon(data) {
   })
 }
 
+function becomeMonitored(time) {
+  model.update({time, monitored: true}, {quiet: true})
+}
+
 const minCloseAfter = Duration.seconds(0.5)
 
 async function flash(closeAfter = minCloseAfter) {
@@ -94,7 +98,7 @@ let lastDay
 function maybeSynthesizeMonitored(time) {
   const day = dayOfTime(time)
   if (day != lastDay) {
-    model.update({time, monitored: true}, {quiet: true})
+    becomeMonitored(time)
   }
   lastDay = day
 }
@@ -208,6 +212,9 @@ function getIdleState() {
 function idleStateChanged(idleState) {
   const time = now()
   lastIdleStateUpdated = time
+  if (idleState == 'locked') {
+    becomeMonitored(time)
+  }
   model.update({time, idleState})
 }
 
