@@ -1,16 +1,9 @@
 # Ergometer
 
-Ergometer is a browser extension intended to prevent or mitigate RSI by monitoring user activity.
+Ergometer is a Windows program intended to prevent or mitigate RSI by monitoring user activity.
 
 With it, you can:
 
 - Configure targets (enforced by increasingly insistent reminders) for total daily activity, individual activity sessions, and rest breaks between sessions.
-- Pause or resume monitoring at any time.
 - Display historical activity.
-- Sync all activity between computers (in private beta).
-
-Download links:
-
-- [Chrome Web Store][1]
-
-[1]: https://chrome.google.com/webstore/detail/ergometer/eoglffpgmfalknfnddidnlkbglbdlgka
+- Sync all activity between computers (requires an internet-accessible server to act as a relay).
