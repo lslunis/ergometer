@@ -2,6 +2,7 @@
 #include <vector>
 #include <iostream>
 #include <stdlib.h>
+#include <string>
 using namespace std;
 
 int main() {
@@ -38,5 +39,46 @@ int main() {
         devices.resize(num_devices);
     }
 
-    cout << "Actually got " << devices.size() << " elements" << endl;
+    cout << "Actually got " << devices.size() << " elements." << endl << endl;
+
+    for (const auto& ridl : devices) {
+        switch (ridl.dwType) {
+        case RIM_TYPEHID:
+            cout << "The device is an HID that is not a keyboard and not a mouse." << endl;
+            break;
+        case RIM_TYPEKEYBOARD:
+            cout << "The device is a keyboard." << endl;
+            break;
+        case RIM_TYPEMOUSE:
+            cout << "The device is a mouse." << endl;
+            break;
+        default:
+            cout << "Unknown dwType " << ridl.dwType << endl;
+            break;
+        }
+
+        string str(1000, '?'); // FIXME, lazy
+
+        UINT character_count = str.size() + 1; // include null terminator in std::string
+
+        const UINT ret = GetRawInputDeviceInfoA(ridl.hDevice, RIDI_DEVICENAME, str.data(), &character_count);
+
+        if (ret == 0 || ret == static_cast<UINT>(-1)) {
+            cerr << "Can't handle these GetRawInputDeviceInfoA cases yet" << endl;
+            exit(EXIT_FAILURE);
+        }
+
+        const UINT new_size = ret - 1; // exclude null terminator from WinAPI
+
+        if (new_size > str.size()) {
+            cerr << "Can't happen, how did we get more characters than we had room for?" << endl;
+            exit(EXIT_FAILURE);
+        }
+
+        str.erase(new_size);
+
+        cout << "Name: \"" << str << "\"" << endl;
+
+        cout << endl;
+    }
 }
