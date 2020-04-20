@@ -38,12 +38,12 @@ OnCreate(HWND hwnd, [[maybe_unused]] LPCREATESTRUCT lpcs)
   RAWINPUTDEVICE dev[2];
   dev[0].usUsagePage = 1;
   dev[0].usUsage = 6;
-  dev[0].dwFlags = 0;
+  dev[0].dwFlags = RIDEV_INPUTSINK;
   dev[0].hwndTarget = hwnd;
 
   dev[1].usUsagePage = 1;
   dev[1].usUsage = 2;
-  dev[1].dwFlags = 0;
+  dev[1].dwFlags = RIDEV_INPUTSINK;
   dev[1].hwndTarget = hwnd;
 
   RegisterRawInputDevices(dev, sizeof(dev) / sizeof(dev[0]), sizeof(dev[0]));
