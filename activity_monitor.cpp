@@ -7,6 +7,7 @@
 #include <commctrl.h>
 #include <shlwapi.h>
 #include <strsafe.h>
+#include <assert.h>
 
 constexpr UINT_PTR IDT_TIMER1 = 1;
 
@@ -100,22 +101,53 @@ void OnInput([[maybe_unused]] HWND hwnd, [[maybe_unused]] WPARAM code, HRAWINPUT
         StringCchCat(prefix, ARRAYSIZE(prefix), TEXT("E1 "));
     }
 
+    RID_DEVICE_INFO device_info{};
+    UINT cbSize = sizeof(device_info);
+    const UINT ret = GetRawInputDeviceInfoA(input->header.hDevice, RIDI_DEVICEINFO, &device_info, &cbSize);
+    if (ret == 0 || ret == static_cast<UINT>(-1)) {
+        assert(false);
+    }
+    if (ret != sizeof(device_info)) {
+        assert(false);
+    }
+    // GetRawInputDeviceInfoA reported success
+    if (device_info.cbSize != sizeof(device_info) || device_info.dwType != input->header.dwType) {
+        assert(false);
+    }
+
     TCHAR buffer[256];
     StringCchPrintf(buffer, ARRAYSIZE(buffer),
-        TEXT("%p, msg=%04x, vk=%04x, scanCode=%s%02x, %s"),
+        TEXT("%p, msg=%04x, vk=%04x, scanCode=%s%02x, %s, dwNumberOfFunctionKeys %u, dwNumberOfIndicators %u, dwNumberOfKeysTotal %u"),
         input->header.hDevice,
         input->data.keyboard.Message,
         input->data.keyboard.VKey,
         prefix,
         input->data.keyboard.MakeCode,
         (input->data.keyboard.Flags & RI_KEY_BREAK)
-            ? TEXT("release") : TEXT("press"));
+            ? TEXT("release") : TEXT("press"),
+        device_info.keyboard.dwNumberOfFunctionKeys,
+        device_info.keyboard.dwNumberOfIndicators,
+        device_info.keyboard.dwNumberOfKeysTotal);
     ListBox_AddString(g_hwndChild, buffer);
   } else if (input->header.dwType == RIM_TYPEMOUSE) {
     if (input->data.mouse.usButtonFlags != 0) { // print only transitions of the mouse buttons
+        RID_DEVICE_INFO device_info{};
+        UINT cbSize = sizeof(device_info);
+        const UINT ret = GetRawInputDeviceInfoA(input->header.hDevice, RIDI_DEVICEINFO, &device_info, &cbSize);
+        if (ret == 0 || ret == static_cast<UINT>(-1)) {
+            assert(false);
+        }
+        if (ret != sizeof(device_info)) {
+            assert(false);
+        }
+        // GetRawInputDeviceInfoA reported success
+        if (device_info.cbSize != sizeof(device_info) || device_info.dwType != input->header.dwType) {
+            assert(false);
+        }
+
         TCHAR buffer[256];
         StringCchPrintf(buffer, ARRAYSIZE(buffer),
-          TEXT("MOUSE %p, usFlags 0x%04x, usButtonFlags 0x%04x, usButtonData %d, ulRawButtons 0x%08x, lLastX %d, lLastY &d, ulExtraInformation 0x%08x"),
+          TEXT("MOUSE %p, usFlags 0x%04x, usButtonFlags 0x%04x, usButtonData %d, ulRawButtons 0x%08x, lLastX %d, lLastY %d, ulExtraInformation 0x%08x, dwNumberOfButtons %u"),
           input->header.hDevice,
           input->data.mouse.usFlags,
           input->data.mouse.usButtonFlags,
@@ -123,7 +155,8 @@ void OnInput([[maybe_unused]] HWND hwnd, [[maybe_unused]] WPARAM code, HRAWINPUT
           input->data.mouse.ulRawButtons,
           input->data.mouse.lLastX,
           input->data.mouse.lLastY,
-          input->data.mouse.ulExtraInformation
+          input->data.mouse.ulExtraInformation,
+          device_info.mouse.dwNumberOfButtons
         );
         ListBox_AddString(g_hwndChild, buffer);
     }
