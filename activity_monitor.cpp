@@ -1,4 +1,9 @@
 #include <Windows.h>
+
+extern "C" { // Necessary for MinGW; shouldn't be necessary for real WinSDK?
+#include <Hidsdi.h>
+}
+
 #include <vector>
 #include <iostream>
 #include <stdlib.h>
@@ -78,6 +83,27 @@ int main() {
         str.erase(new_size);
 
         cout << "Name: \"" << str << "\"" << endl;
+
+
+        HANDLE hand = CreateFileA(str.c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr);
+
+        if (hand == INVALID_HANDLE_VALUE) {
+            cerr << "CreateFileA failed" << endl;
+            // exit(EXIT_FAILURE);
+        } else {
+            wstring device_name(126, L'?');
+
+            const BOOLEAN get_product_string_ret = HidD_GetProductString(hand, device_name.data(), (device_name.size() + 1 /* wstring null terminator */) * sizeof(wchar_t));
+
+            if (!get_product_string_ret) {
+                cerr << "HidD_GetProductString failed" << endl;
+                exit(EXIT_FAILURE);
+            }
+
+            CloseHandle(hand); // should be RAII
+
+            cout << "success" << endl;
+        }
 
         cout << endl;
     }
