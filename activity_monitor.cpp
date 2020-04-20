@@ -99,30 +99,6 @@ int main() {
             }
         }
 
-        {
-            string str(1000, '?'); // FIXME, lazy
-
-            UINT character_count = str.size() + 1; // include null terminator in std::string
-
-            const UINT ret = GetRawInputDeviceInfoA(ridl.hDevice, RIDI_DEVICENAME, str.data(), &character_count);
-
-            if (ret == 0 || ret == static_cast<UINT>(-1)) {
-                cerr << "Can't handle these GetRawInputDeviceInfoA cases yet" << endl;
-                exit(EXIT_FAILURE);
-            }
-
-            const UINT new_size = ret - 1; // exclude null terminator from WinAPI
-
-            if (new_size > str.size()) {
-                cerr << "Can't happen, how did we get more characters than we had room for?" << endl;
-                exit(EXIT_FAILURE);
-            }
-
-            str.erase(new_size);
-
-            cout << "Name: \"" << str << "\"" << endl;
-        }
-
         cout << endl;
     }
 }
