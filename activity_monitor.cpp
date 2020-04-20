@@ -1,9 +1,4 @@
 #include <Windows.h>
-
-extern "C" { // Necessary for MinGW; shouldn't be necessary for real WinSDK?
-#include <Hidsdi.h>
-}
-
 #include <vector>
 #include <iostream>
 #include <stdlib.h>
@@ -62,47 +57,70 @@ int main() {
             break;
         }
 
-        string str(1000, '?'); // FIXME, lazy
+        if (ridl.dwType == RIM_TYPEKEYBOARD || ridl.dwType == RIM_TYPEMOUSE) {
+            RID_DEVICE_INFO device_info{};
 
-        UINT character_count = str.size() + 1; // include null terminator in std::string
+            UINT cbSize = sizeof(device_info);
 
-        const UINT ret = GetRawInputDeviceInfoA(ridl.hDevice, RIDI_DEVICENAME, str.data(), &character_count);
+            const UINT ret = GetRawInputDeviceInfoA(ridl.hDevice, RIDI_DEVICEINFO, &device_info, &cbSize);
 
-        if (ret == 0 || ret == static_cast<UINT>(-1)) {
-            cerr << "Can't handle these GetRawInputDeviceInfoA cases yet" << endl;
-            exit(EXIT_FAILURE);
-        }
-
-        const UINT new_size = ret - 1; // exclude null terminator from WinAPI
-
-        if (new_size > str.size()) {
-            cerr << "Can't happen, how did we get more characters than we had room for?" << endl;
-            exit(EXIT_FAILURE);
-        }
-
-        str.erase(new_size);
-
-        cout << "Name: \"" << str << "\"" << endl;
-
-
-        HANDLE hand = CreateFileA(str.c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr);
-
-        if (hand == INVALID_HANDLE_VALUE) {
-            cerr << "CreateFileA failed" << endl;
-            // exit(EXIT_FAILURE);
-        } else {
-            wstring device_name(126, L'?');
-
-            const BOOLEAN get_product_string_ret = HidD_GetProductString(hand, device_name.data(), (device_name.size() + 1 /* wstring null terminator */) * sizeof(wchar_t));
-
-            if (!get_product_string_ret) {
-                cerr << "HidD_GetProductString failed" << endl;
+            if (ret == 0 || ret == static_cast<UINT>(-1)) {
+                cerr << "GetRawInputDeviceInfoA failed" << endl;
                 exit(EXIT_FAILURE);
             }
 
-            CloseHandle(hand); // should be RAII
+            if (ret != sizeof(device_info)) {
+                cerr << "GetRawInputDeviceInfoA copied an unexpected number of bytes" << endl;
+                exit(EXIT_FAILURE);
+            }
 
-            cout << "success" << endl;
+            // GetRawInputDeviceInfoA reported success
+
+            if (device_info.cbSize != sizeof(device_info) || device_info.dwType != ridl.dwType) {
+                cerr << "Inconsistent info in device_info" << endl;
+                exit(EXIT_FAILURE);
+            }
+
+            if (ridl.dwType == RIM_TYPEKEYBOARD) {
+                cout << "dwType: " << device_info.keyboard.dwType << endl;
+                cout << "dwSubType: " << device_info.keyboard.dwSubType << endl;
+                cout << "dwKeyboardMode: " << device_info.keyboard.dwKeyboardMode << endl;
+                cout << "dwNumberOfFunctionKeys: " << device_info.keyboard.dwNumberOfFunctionKeys << endl;
+                cout << "dwNumberOfIndicators: " << device_info.keyboard.dwNumberOfIndicators << endl;
+                cout << "dwNumberOfKeysTotal: " << device_info.keyboard.dwNumberOfKeysTotal << endl;
+            } else if (ridl.dwType == RIM_TYPEMOUSE) {
+                cout << "dwId: " << device_info.mouse.dwId << endl;
+                cout << "dwNumberOfButtons: " << device_info.mouse.dwNumberOfButtons << endl;
+                cout << "dwSampleRate: " << device_info.mouse.dwSampleRate << endl;
+                cout << "fHasHorizontalWheel: " << device_info.mouse.fHasHorizontalWheel << endl;
+            } else {
+                cerr << "LOGIC ERROR" << endl;
+                exit(EXIT_FAILURE);
+            }
+        }
+
+        {
+            string str(1000, '?'); // FIXME, lazy
+
+            UINT character_count = str.size() + 1; // include null terminator in std::string
+
+            const UINT ret = GetRawInputDeviceInfoA(ridl.hDevice, RIDI_DEVICENAME, str.data(), &character_count);
+
+            if (ret == 0 || ret == static_cast<UINT>(-1)) {
+                cerr << "Can't handle these GetRawInputDeviceInfoA cases yet" << endl;
+                exit(EXIT_FAILURE);
+            }
+
+            const UINT new_size = ret - 1; // exclude null terminator from WinAPI
+
+            if (new_size > str.size()) {
+                cerr << "Can't happen, how did we get more characters than we had room for?" << endl;
+                exit(EXIT_FAILURE);
+            }
+
+            str.erase(new_size);
+
+            cout << "Name: \"" << str << "\"" << endl;
         }
 
         cout << endl;
