@@ -105,7 +105,7 @@ void OnInput([[maybe_unused]] HWND hwnd, [[maybe_unused]] WPARAM code, HRAWINPUT
     UINT cbSize = sizeof(device_info);
     const UINT ret = GetRawInputDeviceInfoA(input->header.hDevice, RIDI_DEVICEINFO, &device_info, &cbSize);
     if (ret == 0 || ret == static_cast<UINT>(-1)) {
-        assert(false);
+        assert(false); // failed
     }
     if (ret != sizeof(device_info)) {
         assert(false);
@@ -135,7 +135,7 @@ void OnInput([[maybe_unused]] HWND hwnd, [[maybe_unused]] WPARAM code, HRAWINPUT
       UINT cbSize = sizeof(device_info);
       const UINT ret = GetRawInputDeviceInfoA(input->header.hDevice, RIDI_DEVICEINFO, &device_info, &cbSize);
       if (ret == 0 || ret == static_cast<UINT>(-1)) {
-          assert(false);
+          assert(false); // failed
       }
       if (ret != sizeof(device_info)) {
           assert(false);
