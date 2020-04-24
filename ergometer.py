@@ -1,5 +1,8 @@
 import aiosqlite
 import asyncio
+from collections import defaultdict
+import re
+import time as timelib
 
 
 async def read_subprocess(cmd, broker):
@@ -10,10 +13,10 @@ async def read_subprocess(cmd, broker):
         stderr=asyncio.subprocess.DEVNULL,
     )
     while True:
-        message = await proc.stdout.readline()
-        if not message.endswith("\n"):
-            raise ValueError(f"truncated message: {message!r}")
-        broker.publish(message.strip())
+        event = await proc.stdout.readline()
+        if not event.endswith("\n"):
+            raise ValueError(f"truncated event: {event!r}")
+        broker.publish(event)
 
 
 async def commit_state(broker):
@@ -21,9 +24,9 @@ async def commit_state(broker):
         await db.execute(
             """
             CREATE TABLE IF NOT EXISTS "offsets" (
-                "host" INTEGER PRIMARY KEY,
+                "host" TEXT PRIMARY KEY,
                 "offset" INTEGER NOT NULL
-            )"""
+            ) WITHOUT ROWID"""
         )
         await db.execute(
             """
@@ -49,11 +52,9 @@ async def commit_state(broker):
         )
         await db.execute('''DROP INDEX IF EXISTS "rests"''')
 
-        async with db.execute(
-            """SELECT "target" FROM "targets" WHERE "name" = 'r'"""
-        ) as cursor:
-            async for (rest_target,) in cursor:
-                pass
+        rest_target = await fetch_one(
+            db.execute("""SELECT "target" FROM "targets" WHERE "name" = 'r'""")
+        )
         await db.execute(
             f"""
             CREATE UNIQUE INDEX "rests" ON "gaps" ("start")
@@ -66,8 +67,58 @@ async def commit_state(broker):
             async for host, offset in cursor:
                 offsets.append((host, offset))
         await db.commit()
-        async for x in broker.subscribe(offsets):
+        pattern = re.compile(r"^(\d+) (?:(h)|([dsr])) (\d+)$", re.M)
+        async for host, offset, payload in broker.subscribe(offsets):
+            now = timelib.time()
+            expected_offset = await fetch_one(
+                db.execute(
+                    """SELECT "offset" FROM "offsets" WHERE "host" = ?""", host
+                ),
+                0,
+            )
+            check(
+                offset == expected_offset,
+                f"expected offset {host}:{expected_offset}, got {offset}",
+            )
+            targets = {}
+            totals = defaultdict(int)
+            for (
+                _,
+                time_str,
+                target_name,
+                action_name,
+                value_str,
+            ) in pattern.finditer(payload):
+                time = int(time_str)
+                value = int(value_str)
+                if target_name:
+                    if (
+                        target_name not in targets
+                        or targets[target_name][0] < time
+                    ):
+                        targets[target_name] = (time, value)
+                elif action_name:
+                    totals[time // 300 * 300] += value
+                    if now - time < 3600:
+                        pass
+        await db.execute(
+            'INSERT OR REPLACE INTO "offsets" VALUES (?,?)', (host, offset)
+        )
+        for name in targets:
+            time, value = targets[name]
+            await db.execute("")
+
+
+async def get_rest_start(db):
+    await fetch_one(db.execute('SELECT MAX("start") FROM "gaps"'))
+
+
+async def fetch_one(cursor, default=None):
+    value = default
+    async with cursor:
+        async for (value,) in cursor:
             pass
+    return value
 
 
 class Broker:
