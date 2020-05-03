@@ -102,10 +102,11 @@ void OnInput([[maybe_unused]] HWND hwnd, [[maybe_unused]] WPARAM code, HRAWINPUT
     }
 
     RID_DEVICE_INFO device_info{};
+    device_info.cbSize = sizeof(device_info);
     UINT cbSize = sizeof(device_info);
     const UINT ret = GetRawInputDeviceInfoA(input->header.hDevice, RIDI_DEVICEINFO, &device_info, &cbSize);
     if (ret == 0 || ret == static_cast<UINT>(-1)) {
-        assert(false); // failed
+        assert(false); // failed - FIXED???
     }
     if (ret != sizeof(device_info)) {
         assert(false);
@@ -132,10 +133,11 @@ void OnInput([[maybe_unused]] HWND hwnd, [[maybe_unused]] WPARAM code, HRAWINPUT
   } else if (input->header.dwType == RIM_TYPEMOUSE) {
     if (input->data.mouse.usButtonFlags != 0) { // print only transitions of the mouse buttons
       RID_DEVICE_INFO device_info{};
+      device_info.cbSize = sizeof(device_info);
       UINT cbSize = sizeof(device_info);
       const UINT ret = GetRawInputDeviceInfoA(input->header.hDevice, RIDI_DEVICEINFO, &device_info, &cbSize);
       if (ret == 0 || ret == static_cast<UINT>(-1)) {
-          assert(false); // failed
+          assert(false); // failed - FIXED???
       }
       if (ret != sizeof(device_info)) {
           assert(false);
