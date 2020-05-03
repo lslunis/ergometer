@@ -59,6 +59,7 @@ int main() {
 
         if (ridl.dwType == RIM_TYPEKEYBOARD || ridl.dwType == RIM_TYPEMOUSE) {
             RID_DEVICE_INFO device_info{};
+            device_info.cbSize = sizeof(device_info);
 
             UINT cbSize = sizeof(device_info);
 
