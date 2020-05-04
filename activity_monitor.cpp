@@ -9,6 +9,7 @@
 #include <shlwapi.h>
 #include <strsafe.h>
 #include <assert.h>
+#include <memory>
 
 constexpr UINT_PTR IDT_TIMER1 = 1;
 
@@ -84,14 +85,44 @@ OnDestroy(HWND hwnd)
   ((fn)((hwnd), GET_RAWINPUT_CODE_WPARAM(wParam), \
         (HRAWINPUT)(lParam)), 0)
 
+struct Guard_DefRawInputProc {
+    RAWINPUT *input;
+
+    ~Guard_DefRawInputProc() {
+        DefRawInputProc(&input, 1, sizeof(RAWINPUTHEADER));
+    }
+};
+
 void OnInput([[maybe_unused]] HWND hwnd, [[maybe_unused]] WPARAM code, HRAWINPUT hRawInput)
 {
   UINT dwSize;
   GetRawInputData(hRawInput, RID_INPUT, nullptr,
                   &dwSize, sizeof(RAWINPUTHEADER));
-  RAWINPUT *input = (RAWINPUT *)malloc(dwSize);
+  auto storage = std::make_unique<unsigned char[]>(dwSize);
+  RAWINPUT *input = reinterpret_cast<RAWINPUT *>(storage.get());
+  Guard_DefRawInputProc guard{input};
+
   GetRawInputData(hRawInput, RID_INPUT, input,
                   &dwSize, sizeof(RAWINPUTHEADER));
+
+  if (!(input->header.dwType == RIM_TYPEKEYBOARD ||
+    (input->header.dwType == RIM_TYPEMOUSE && input->data.mouse.usButtonFlags != 0))) {
+    return; // process only keyboard and mouse button events (not mouse movement or other devices)
+  }
+
+  if (!input->header.hDevice) {
+    return; // skip null handles (representing synthetic keyboards/mice?)
+  }
+
+  RID_DEVICE_INFO device_info{};
+  device_info.cbSize = sizeof(device_info);
+  UINT cbSize = sizeof(device_info);
+  const UINT ret = GetRawInputDeviceInfoA(input->header.hDevice, RIDI_DEVICEINFO, &device_info, &cbSize);
+
+  if (ret != sizeof(device_info) || device_info.cbSize != sizeof(device_info) || device_info.dwType != input->header.dwType) {
+    assert(false);
+  }
+
   if (input->header.dwType == RIM_TYPEKEYBOARD) {
     TCHAR prefix[80];
     prefix[0] = TEXT('\0');
@@ -100,25 +131,6 @@ void OnInput([[maybe_unused]] HWND hwnd, [[maybe_unused]] WPARAM code, HRAWINPUT
     }
     if (input->data.keyboard.Flags & RI_KEY_E1) {
         StringCchCat(prefix, ARRAYSIZE(prefix), TEXT("E1 "));
-    }
-
-    DWORD number_of_function_keys = 0;
-    DWORD number_of_indicators = 0;
-    DWORD number_of_keys_total = 0;
-
-    if (input->header.hDevice) {
-        RID_DEVICE_INFO device_info{};
-        device_info.cbSize = sizeof(device_info);
-        UINT cbSize = sizeof(device_info);
-        const UINT ret = GetRawInputDeviceInfoA(input->header.hDevice, RIDI_DEVICEINFO, &device_info, &cbSize);
-
-        if (ret != sizeof(device_info) || device_info.cbSize != sizeof(device_info) || device_info.dwType != input->header.dwType) {
-            assert(false);
-        }
-
-        number_of_function_keys = device_info.keyboard.dwNumberOfFunctionKeys;
-        number_of_indicators = device_info.keyboard.dwNumberOfIndicators;
-        number_of_keys_total = device_info.keyboard.dwNumberOfKeysTotal;
     }
 
     TCHAR buffer[256];
@@ -131,27 +143,11 @@ void OnInput([[maybe_unused]] HWND hwnd, [[maybe_unused]] WPARAM code, HRAWINPUT
         input->data.keyboard.MakeCode,
         (input->data.keyboard.Flags & RI_KEY_BREAK)
             ? TEXT("release") : TEXT("press"),
-        number_of_function_keys,
-        number_of_indicators,
-        number_of_keys_total);
+        device_info.keyboard.dwNumberOfFunctionKeys,
+        device_info.keyboard.dwNumberOfIndicators,
+        device_info.keyboard.dwNumberOfKeysTotal);
     ListBox_AddString(g_hwndChild, buffer);
-  } else if (input->header.dwType == RIM_TYPEMOUSE) {
-    if (input->data.mouse.usButtonFlags != 0) { // print only transitions of the mouse buttons
-        DWORD number_of_buttons = 0;
-
-        if (input->header.hDevice) {
-            RID_DEVICE_INFO device_info{};
-            device_info.cbSize = sizeof(device_info);
-            UINT cbSize = sizeof(device_info);
-            const UINT ret = GetRawInputDeviceInfoA(input->header.hDevice, RIDI_DEVICEINFO, &device_info, &cbSize);
-
-            if (ret != sizeof(device_info) || device_info.cbSize != sizeof(device_info) || device_info.dwType != input->header.dwType) {
-                assert(false);
-            }
-
-            number_of_buttons = device_info.mouse.dwNumberOfButtons;
-        }
-
+  } else {
       TCHAR buffer[256];
       StringCchPrintf(buffer, ARRAYSIZE(buffer),
         TEXT("MOUSE %p, usFlags 0x%04x, usButtonFlags 0x%04x, usButtonData %d, ulRawButtons 0x%08x, lLastX %d, lLastY %d, ulExtraInformation 0x%08x, dwNumberOfButtons %u"),
@@ -163,13 +159,10 @@ void OnInput([[maybe_unused]] HWND hwnd, [[maybe_unused]] WPARAM code, HRAWINPUT
         input->data.mouse.lLastX,
         input->data.mouse.lLastY,
         input->data.mouse.ulExtraInformation,
-        number_of_buttons
+        device_info.mouse.dwNumberOfButtons
       );
       ListBox_AddString(g_hwndChild, buffer);
-    }
   }
-  DefRawInputProc(&input, 1, sizeof(RAWINPUTHEADER));
-  free(input);
 }
 
 /*
