@@ -1,4 +1,5 @@
 // g++ -Wall -Wextra -std=c++17 -mwindows activity_monitor.cpp -lcomctl32 -lole32 -o activity_monitor.exe
+// cl /EHsc /nologo /W4 /std:c++17 activity_monitor.cpp comctl32.lib ole32.lib user32.lib
 
 #define STRICT
 #include <windows.h>
@@ -101,19 +102,23 @@ void OnInput([[maybe_unused]] HWND hwnd, [[maybe_unused]] WPARAM code, HRAWINPUT
         StringCchCat(prefix, ARRAYSIZE(prefix), TEXT("E1 "));
     }
 
-    RID_DEVICE_INFO device_info{};
-    device_info.cbSize = sizeof(device_info);
-    UINT cbSize = sizeof(device_info);
-    const UINT ret = GetRawInputDeviceInfoA(input->header.hDevice, RIDI_DEVICEINFO, &device_info, &cbSize);
-    if (ret == 0 || ret == static_cast<UINT>(-1)) {
-        assert(false); // failed - FIXED???
-    }
-    if (ret != sizeof(device_info)) {
-        assert(false);
-    }
-    // GetRawInputDeviceInfoA reported success
-    if (device_info.cbSize != sizeof(device_info) || device_info.dwType != input->header.dwType) {
-        assert(false);
+    DWORD number_of_function_keys = 0;
+    DWORD number_of_indicators = 0;
+    DWORD number_of_keys_total = 0;
+
+    if (input->header.hDevice) {
+        RID_DEVICE_INFO device_info{};
+        device_info.cbSize = sizeof(device_info);
+        UINT cbSize = sizeof(device_info);
+        const UINT ret = GetRawInputDeviceInfoA(input->header.hDevice, RIDI_DEVICEINFO, &device_info, &cbSize);
+
+        if (ret != sizeof(device_info) || device_info.cbSize != sizeof(device_info) || device_info.dwType != input->header.dwType) {
+            assert(false);
+        }
+
+        number_of_function_keys = device_info.keyboard.dwNumberOfFunctionKeys;
+        number_of_indicators = device_info.keyboard.dwNumberOfIndicators;
+        number_of_keys_total = device_info.keyboard.dwNumberOfKeysTotal;
     }
 
     TCHAR buffer[256];
@@ -126,26 +131,26 @@ void OnInput([[maybe_unused]] HWND hwnd, [[maybe_unused]] WPARAM code, HRAWINPUT
         input->data.keyboard.MakeCode,
         (input->data.keyboard.Flags & RI_KEY_BREAK)
             ? TEXT("release") : TEXT("press"),
-        device_info.keyboard.dwNumberOfFunctionKeys,
-        device_info.keyboard.dwNumberOfIndicators,
-        device_info.keyboard.dwNumberOfKeysTotal);
+        number_of_function_keys,
+        number_of_indicators,
+        number_of_keys_total);
     ListBox_AddString(g_hwndChild, buffer);
   } else if (input->header.dwType == RIM_TYPEMOUSE) {
     if (input->data.mouse.usButtonFlags != 0) { // print only transitions of the mouse buttons
-      RID_DEVICE_INFO device_info{};
-      device_info.cbSize = sizeof(device_info);
-      UINT cbSize = sizeof(device_info);
-      const UINT ret = GetRawInputDeviceInfoA(input->header.hDevice, RIDI_DEVICEINFO, &device_info, &cbSize);
-      if (ret == 0 || ret == static_cast<UINT>(-1)) {
-          assert(false); // failed - FIXED???
-      }
-      if (ret != sizeof(device_info)) {
-          assert(false);
-      }
-      // GetRawInputDeviceInfoA reported success
-      if (device_info.cbSize != sizeof(device_info) || device_info.dwType != input->header.dwType) {
-          assert(false);
-      }
+        DWORD number_of_buttons = 0;
+
+        if (input->header.hDevice) {
+            RID_DEVICE_INFO device_info{};
+            device_info.cbSize = sizeof(device_info);
+            UINT cbSize = sizeof(device_info);
+            const UINT ret = GetRawInputDeviceInfoA(input->header.hDevice, RIDI_DEVICEINFO, &device_info, &cbSize);
+
+            if (ret != sizeof(device_info) || device_info.cbSize != sizeof(device_info) || device_info.dwType != input->header.dwType) {
+                assert(false);
+            }
+
+            number_of_buttons = device_info.mouse.dwNumberOfButtons;
+        }
 
       TCHAR buffer[256];
       StringCchPrintf(buffer, ARRAYSIZE(buffer),
@@ -158,7 +163,7 @@ void OnInput([[maybe_unused]] HWND hwnd, [[maybe_unused]] WPARAM code, HRAWINPUT
         input->data.mouse.lLastX,
         input->data.mouse.lLastY,
         input->data.mouse.ulExtraInformation,
-        device_info.mouse.dwNumberOfButtons
+        number_of_buttons
       );
       ListBox_AddString(g_hwndChild, buffer);
     }
