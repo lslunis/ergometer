@@ -1,0 +1,12 @@
+---
+BasedOnStyle: LLVM
+BreakBeforeBinaryOperators: NonAssignment
+IncludeBlocks: Regroup
+IncludeCategories:
+  - Regex:           '^<Windows\.h>$'
+    Priority:        1
+  - Regex:           '.*'
+    Priority:        2
+IndentWidth: 4
+PointerAlignment: Left
+...
