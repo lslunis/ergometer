@@ -1,11 +1,12 @@
 import datetime
+from enum import Enum
 from itertools import chain, islice, repeat
 import struct
 
-from sqlalchemy import Column, Integer, String, create_engine, event, func
+from sqlalchemy import Column, Integer, String, create_engine, event
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-
+from sqlalchemy.sql import func
 
 engine = create_engine("sqlite:///state.db")
 Session = sessionmaker(bind=engine)
@@ -44,9 +45,8 @@ class Target(Base):
     time = Column(Integer, nullable=False)
 
     @staticmethod
-    def get(session, id):
-        if id >= len(Target.names):
-            raise ValueError(f"unexpected target id: {id}")
+    def get(session, kind):
+        id = kind.value
         target = session.query(Target).get(id)
         if target is None:
             target = Target(id=id, time=0)
@@ -55,11 +55,7 @@ class Target(Base):
 
     @staticmethod
     def as_state(*targets):
-        return {f"{t.name}_target": t.target for t in targets}
-
-    @property
-    def name(self):
-        return Target.names[self.id]
+        return {Kind(t.id).name: t.target for t in targets}
 
     def update_if_newer(self, target, time):
         if self.time < time:
@@ -75,6 +71,14 @@ class Total(Base):
     def get(session, time):
         start = lower_bound_of(time, period=300)
         return session.query(Total).get(start)
+
+    @staticmethod
+    def daily(session, day):
+        return (
+            session.query(func.sum(Total.total))
+            .filter(is_on_day(Total.start, day))
+            .scalar()
+        )
 
 
 class Pause(Base):
@@ -97,35 +101,49 @@ class Pause(Base):
         )
 
 
+class Kind(Enum):
+    daily_target = 1
+    session_target = 2
+    rest_target = 3
+    action = 4
+
+
 @retry_on(PositionError)
 async def state_updater(state, broker):
     host_positions = initialize_state(state, imprecise_clock(), Session())
     async for args in broker.subscribe(host_positions):
-        update_state(state, imprecise_clock(), Session(), *args)
+        update_state(imprecise_clock(), Session(), *args, **state)
 
 
 def initialize_state(state, now, session):
+    today = day_of(now)
     delta = {
         **Target.as_state(*session.query(Target)),
+        "day": today,
+        "daily_total": Total.daily(session, today),
         **Pause.as_state(session),
     }
     host_positions = {
         hp.host: hp.position for hp in session.query(HostPosition)
     }
     session.commit()
+    state.update(delta)
     return state, host_positions
 
 
-def update_state(now, session, host, data, position):
+def update_state(
+    now, session, host, data, position, *, day, daily_total, **state
+):
     host_position = session.query(HostPosition).get(host)
     if position != host_position.position:
         raise PositionError(f"expected {host_position}, got {position}")
     host_position.position += len(data)
-    for kind, value, time in struct.iter_unpack("<BxxxIQ", data):
-        if kind > 4:
-            raise ValueError(f"unknown event kind: {kind}")
-        is_action = kind == 4
-        if is_action:
+    today = day_of(now)
+    if day != today:
+        pass
+    for kind_value, value, time in struct.iter_unpack("<BxxxIQ", data):
+        kind = Kind(kind_value)
+        if kind == Kind.action:
             Total.get(time).total += value
             if now - time < 3600:
                 pass
