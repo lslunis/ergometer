@@ -152,15 +152,16 @@ class PauseUpdater:
         total = span - left_span - right_span
         die_unless(0 < total < 2 * min_span, f"unexpected total: {total}")
 
-        if left_span:
-            self.session.add(Pause(start=(time - left_span), end=time))
-            self.start = time
-
         if right_span:
             self.pause.start = self.pause.end - right_span
         else:
             self.session.delete(self.pause)
+            self.session.flush()
             self.pause = None
+
+        if left_span:
+            self.session.add(Pause(start=(time - left_span), end=time))
+            self.start = time
 
         return total
 
