@@ -1,6 +1,4 @@
 import asyncio
-from collections import defaultdict
-from functools import wraps
 
 
 async def read_subprocess(cmd, broker):
@@ -35,21 +33,6 @@ async def commit_state(broker):
 class Broker:
     def publish(message):
         pass
-
-
-def retry_on(Error):
-    def curry(loop):
-        @wraps(loop)
-        async def retry_loop(*args, **kwargs):
-            while True:
-                try:
-                    loop(*args, **kwargs)
-                except Error as e:
-                    warn(e)
-
-        return retry_loop
-
-    return curry
 
 
 class ChangeEvent(Event):

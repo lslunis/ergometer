@@ -8,6 +8,8 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql import func
 
+from .util import retry_on, PositionError
+
 engine = create_engine("sqlite:///state.db")
 Session = sessionmaker(bind=engine)
 
@@ -123,17 +125,13 @@ def initialize_state(state, now, session):
         "daily_total": Total.daily(session, today),
         **Pause.as_state(session),
     }
-    host_positions = {
-        hp.host: hp.position for hp in session.query(HostPosition)
-    }
+    host_positions = {hp.host: hp.position for hp in session.query(HostPosition)}
     session.commit()
     state.update(delta)
     return state, host_positions
 
 
-def update_state(
-    now, session, host, data, position, *, day, daily_total, **state
-):
+def update_state(now, session, host, data, position, *, day, daily_total, **state):
     host_position = session.query(HostPosition).get(host)
     if position != host_position.position:
         raise PositionError(f"expected {host_position}, got {position}")
@@ -181,9 +179,7 @@ def metrics_at(
 
 def day_of(dt):
     return lower_bound_of(
-        dt.timestamp(),
-        period=86400,
-        offset=dt.utcoffset().total_seconds() + 4 * 3600,
+        dt.timestamp(), period=86400, offset=dt.utcoffset().total_seconds() + 4 * 3600,
     )
 
 
