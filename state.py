@@ -1,6 +1,7 @@
 import datetime
 from enum import Enum
 from itertools import chain, islice, repeat
+from contextlib import contextmanager
 import struct
 
 from sqlalchemy import Column, Integer, String, create_engine, event
@@ -8,24 +9,30 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql import func
 
-from .util import retry_on, PositionError
-
-engine = create_engine("sqlite:///state.db")
-Session = sessionmaker(bind=engine)
+from .util import retry_on, PositionError, die_unless
 
 
-# Override pysqlite's broken transaction handling
-# https://docs.sqlalchemy.org/en/13/dialects/sqlite.html#pysqlite-serializable
+@contextmanager
+def connect(db_address):
+    engine = create_engine(db_address)
 
+    try:
+        # Override pysqlite's broken transaction handling
+        # https://docs.sqlalchemy.org/en/13/dialects/sqlite.html#pysqlite-serializable
+        @event.listens_for(engine, "connect")
+        def do_connect(dbapi_connection, connection_record):
+            dbapi_connection.isolation_level = None
 
-@event.listens_for(engine, "connect")
-def do_connect(dbapi_connection, connection_record):
-    dbapi_connection.isolation_level = None
+        @event.listens_for(engine, "begin")
+        def do_begin(connection):
+            connection.execute("BEGIN")
 
+        Base.metadata.create_all(engine)
 
-@event.listens_for(engine, "begin")
-def do_begin(connection):
-    connection.execute("BEGIN")
+        yield sessionmaker(bind=engine)
+
+    finally:
+        engine.dispose()
 
 
 Base = declarative_base()
@@ -64,43 +71,98 @@ class Target(Base):
             self.target = target
 
 
-class Total(Base):
-    __tablename__ = "totals"
-    start = Column(Integer, primary_key=True)
-    total = Column(Integer, nullable=False)
-
-    @staticmethod
-    def get(session, time):
-        start = lower_bound_of(time, period=300)
-        return session.query(Total).get(start)
-
-    @staticmethod
-    def daily(session, day):
-        return (
-            session.query(func.sum(Total.total))
-            .filter(is_on_day(Total.start, day))
-            .scalar()
-        )
-
-
 class Pause(Base):
     __tablename__ = "pauses"
+    start = Column(Integer, nullable=False, unique=True)
     end = Column(Integer, primary_key=True)
-    span = Column(Integer, nullable=False)
+
+    def __eq__(self, other):
+        return (
+            isinstance(other, Pause)
+            and self.start == other.start
+            and self.end == other.end
+        )
+
+    def __repr__(self):
+        return f"<Pause {self.start} {self.end}>"
 
     @staticmethod
     def as_state(session):
-        rest_target = Target.get(session, "rest").target
+        rest_target = Target.get(session, Kind.rest_target).target
         rests = (
             session.query(Pause)
             .order_by(Pause.end.desc())
-            .filter(Pause.span >= rest_target)
+            .filter((Pause.end - Pause.start) >= rest_target)
         )
         last_rest, prior_rest = islice(chain(rests.limit(2), repeat(None)), 2)
         return dict(
             session_start=prior_rest.end if prior_rest else 0,
-            rest_start=last_rest.end - last_rest.span if last_rest else 0,
+            rest_start=last_rest.start if last_rest else 0,
         )
+
+    # @staticmethod
+    # def daily(session, day):
+    #     return (
+    #         session.query(func.sum(Total.total))
+    #             .filter(is_on_day(Total.start, day))
+    #             .scalar()
+    #     )
+
+
+min_span = 15
+
+
+def clip_span(span):
+    return 0 if span < min_span else span
+
+
+class PauseUpdater:
+    def __init__(self, session):
+        self.session = session
+        self.start = None
+        self.pause = None
+
+    def seek(self, time):
+        if self.pause and self.start <= time < self.pause.end:
+            return
+        self.pause = (
+            self.session.query(Pause)
+            .filter(time < Pause.end)
+            .order_by(Pause.end)
+            .limit(1)
+            .one_or_none()
+        )
+        if not self.pause:
+            self.pause = Pause(start=0, end=max_time)
+            self.session.add(self.pause)
+        self.start = min(time, self.pause.start)
+
+    def update(self, time, value):
+        # enforces non-overlapping intervals
+        die_unless(value == 1, f"unexpected value: {value}")
+        self.seek(time)
+        left_span = time - self.pause.start
+        if left_span < 0:
+            return 0
+
+        span = self.pause.end - self.pause.start
+        right_span = span - left_span - value
+        left_span = clip_span(left_span)
+        right_span = clip_span(right_span)
+        total = span - left_span - right_span
+        die_unless(0 < total < 2 * min_span, f"unexpected total: {total}")
+
+        if left_span:
+            self.session.add(Pause(start=(time - left_span), end=time))
+            self.start = time
+
+        if right_span:
+            self.pause.start = self.pause.end - right_span
+        else:
+            self.session.delete(self.pause)
+            self.pause = None
+
+        return total
 
 
 class Kind(Enum):
@@ -112,6 +174,7 @@ class Kind(Enum):
 
 @retry_on(PositionError)
 async def state_updater(state, broker):
+    Session = connect("sqlite:///state.db")
     host_positions = initialize_state(state, imprecise_clock(), Session())
     async for args in broker.subscribe(host_positions):
         update_state(imprecise_clock(), Session(), *args, **state)
@@ -122,7 +185,7 @@ def initialize_state(state, now, session):
     delta = {
         **Target.as_state(*session.query(Target)),
         "day": today,
-        "daily_total": Total.daily(session, today),
+        "daily_total": Pause.daily(session, today),
         **Pause.as_state(session),
     }
     host_positions = {hp.host: hp.position for hp in session.query(HostPosition)}
@@ -142,9 +205,7 @@ def update_state(now, session, host, data, position, *, day, daily_total, **stat
     for kind_value, value, time in struct.iter_unpack("<BxxxIQ", data):
         kind = Kind(kind_value)
         if kind == Kind.action:
-            Total.get(time).total += value
-            if now - time < 3600:
-                pass
+            pass
         else:
             target = Target.get(session, kind)
             target.update_if_newer(value, time)
@@ -197,3 +258,6 @@ def precise_clock():
 
 def lower_bound_of(value, *, period, offset=0):
     return (value - offset) // period * period + offset
+
+
+max_time = 2 ** 48 - 1

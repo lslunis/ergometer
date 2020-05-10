@@ -18,3 +18,8 @@ def retry_on(Error):
 
 class PositionError(Exception):
     pass
+
+
+def die_unless(cond, message):
+    if not cond:
+        raise Exception(message)
