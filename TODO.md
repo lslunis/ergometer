@@ -3,3 +3,5 @@
 - https://docs.microsoft.com/en-us/windows/win32/menurc/using-icons
 - https://stackoverflow.com/questions/9494739/how-to-build-a-systemtray-app-for-windows
 - https://stackoverflow.com/questions/41533158/create-32-bit-color-icon-programmatically
+- https://pystray.readthedocs.io/en/latest/usage.html
+- https://websockets.readthedocs.io/en/stable/intro.html
