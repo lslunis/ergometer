@@ -5,3 +5,4 @@
 - https://stackoverflow.com/questions/41533158/create-32-bit-color-icon-programmatically
 - https://pystray.readthedocs.io/en/latest/usage.html
 - https://websockets.readthedocs.io/en/stable/intro.html
+- https://matplotlib.org/index.html
