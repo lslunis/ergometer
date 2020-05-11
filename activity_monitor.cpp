@@ -24,8 +24,7 @@ HWND g_hwndChild;  /* Optional child window */
  *  OnSize
  *      If we have an inner child, resize it to fit.
  */
-void OnSize([[maybe_unused]] HWND hwnd, [[maybe_unused]] UINT state, int cx,
-            int cy) {
+void OnSize([[maybe_unused]] HWND hwnd, [[maybe_unused]] UINT state, int cx, int cy) {
     if (g_hwndChild) {
         MoveWindow(g_hwndChild, 0, 0, cx, cy, TRUE);
     }
@@ -37,10 +36,9 @@ void OnSize([[maybe_unused]] HWND hwnd, [[maybe_unused]] UINT state, int cx,
  *      create a child window.
  */
 BOOL OnCreate(HWND hwnd, [[maybe_unused]] LPCREATESTRUCT lpcs) {
-    g_hwndChild =
-        CreateWindow(TEXT("listbox"), NULL,
-                     LBS_HASSTRINGS | WS_CHILD | WS_VISIBLE | WS_VSCROLL, 0, 0,
-                     0, 0, hwnd, NULL, g_hinst, 0);
+    g_hwndChild = CreateWindow(TEXT("listbox"), NULL,
+                               LBS_HASSTRINGS | WS_CHILD | WS_VISIBLE | WS_VSCROLL, 0,
+                               0, 0, 0, hwnd, NULL, g_hinst, 0);
 
     RAWINPUTDEVICE dev[2];
     dev[0].usUsagePage = 1;
@@ -84,28 +82,24 @@ void OnDestroy(HWND hwnd) {
     PostQuitMessage(0);
 }
 
-#define HANDLE_WM_INPUT(hwnd, wParam, lParam, fn)                              \
+#define HANDLE_WM_INPUT(hwnd, wParam, lParam, fn)                                      \
     ((fn)((hwnd), GET_RAWINPUT_CODE_WPARAM(wParam), (HRAWINPUT)(lParam)), 0)
 
 struct Guard_DefRawInputProc {
     RAWINPUT* input;
 
-    ~Guard_DefRawInputProc() {
-        DefRawInputProc(&input, 1, sizeof(RAWINPUTHEADER));
-    }
+    ~Guard_DefRawInputProc() { DefRawInputProc(&input, 1, sizeof(RAWINPUTHEADER)); }
 };
 
 void OnInput([[maybe_unused]] HWND hwnd, [[maybe_unused]] WPARAM code,
              HRAWINPUT hRawInput) {
     UINT dwSize;
-    GetRawInputData(hRawInput, RID_INPUT, nullptr, &dwSize,
-                    sizeof(RAWINPUTHEADER));
+    GetRawInputData(hRawInput, RID_INPUT, nullptr, &dwSize, sizeof(RAWINPUTHEADER));
     auto storage = std::make_unique<unsigned char[]>(dwSize);
     RAWINPUT* input = reinterpret_cast<RAWINPUT*>(storage.get());
     Guard_DefRawInputProc guard{input};
 
-    GetRawInputData(hRawInput, RID_INPUT, input, &dwSize,
-                    sizeof(RAWINPUTHEADER));
+    GetRawInputData(hRawInput, RID_INPUT, input, &dwSize, sizeof(RAWINPUTHEADER));
 
     if (!(input->header.dwType == RIM_TYPEKEYBOARD
           || (input->header.dwType == RIM_TYPEMOUSE
@@ -121,8 +115,8 @@ void OnInput([[maybe_unused]] HWND hwnd, [[maybe_unused]] WPARAM code,
     RID_DEVICE_INFO device_info{};
     device_info.cbSize = sizeof(device_info);
     UINT cbSize = sizeof(device_info);
-    const UINT ret = GetRawInputDeviceInfoA(
-        input->header.hDevice, RIDI_DEVICEINFO, &device_info, &cbSize);
+    const UINT ret = GetRawInputDeviceInfoA(input->header.hDevice, RIDI_DEVICEINFO,
+                                            &device_info, &cbSize);
 
     if (ret != sizeof(device_info) || device_info.cbSize != sizeof(device_info)
         || device_info.dwType != input->header.dwType) {
@@ -140,18 +134,18 @@ void OnInput([[maybe_unused]] HWND hwnd, [[maybe_unused]] WPARAM code,
         }
 
         TCHAR buffer[256];
-        StringCchPrintf(
-            buffer, ARRAYSIZE(buffer),
-            TEXT("%p, msg=%04x, vk=%04x, scanCode=%s%02x, %s, "
-                 "dwNumberOfFunctionKeys %u, dwNumberOfIndicators %u, "
-                 "dwNumberOfKeysTotal %u"),
-            input->header.hDevice, input->data.keyboard.Message,
-            input->data.keyboard.VKey, prefix, input->data.keyboard.MakeCode,
-            (input->data.keyboard.Flags & RI_KEY_BREAK) ? TEXT("release")
-                                                        : TEXT("press"),
-            device_info.keyboard.dwNumberOfFunctionKeys,
-            device_info.keyboard.dwNumberOfIndicators,
-            device_info.keyboard.dwNumberOfKeysTotal);
+        StringCchPrintf(buffer, ARRAYSIZE(buffer),
+                        TEXT("%p, msg=%04x, vk=%04x, scanCode=%s%02x, %s, "
+                             "dwNumberOfFunctionKeys %u, dwNumberOfIndicators %u, "
+                             "dwNumberOfKeysTotal %u"),
+                        input->header.hDevice, input->data.keyboard.Message,
+                        input->data.keyboard.VKey, prefix,
+                        input->data.keyboard.MakeCode,
+                        (input->data.keyboard.Flags & RI_KEY_BREAK) ? TEXT("release")
+                                                                    : TEXT("press"),
+                        device_info.keyboard.dwNumberOfFunctionKeys,
+                        device_info.keyboard.dwNumberOfIndicators,
+                        device_info.keyboard.dwNumberOfKeysTotal);
         ListBox_AddString(g_hwndChild, buffer);
     } else {
         TCHAR buffer[256];
@@ -174,8 +168,7 @@ void OnInput([[maybe_unused]] HWND hwnd, [[maybe_unused]] WPARAM code,
  *  PaintContent
  *      Interesting things will be painted here eventually.
  */
-void PaintContent([[maybe_unused]] HWND hwnd,
-                  [[maybe_unused]] PAINTSTRUCT* pps) {}
+void PaintContent([[maybe_unused]] HWND hwnd, [[maybe_unused]] PAINTSTRUCT* pps) {}
 
 /*
  *  OnPaint
@@ -245,16 +238,16 @@ int WINAPI WinMain(HINSTANCE hinst, [[maybe_unused]] HINSTANCE hinstPrev,
     g_hinst = hinst;
     if (!InitApp())
         return 0;
-    if (SUCCEEDED(CoInitialize(NULL))) {         /* In case we use COM */
-        hwnd = CreateWindow(TEXT("Scratch"),     /* Class Name */
-                            TEXT("Scratch"),     /* Title */
-                            WS_OVERLAPPEDWINDOW, /* Style */
+    if (SUCCEEDED(CoInitialize(NULL))) {                  /* In case we use COM */
+        hwnd = CreateWindow(TEXT("Scratch"),              /* Class Name */
+                            TEXT("Scratch"),              /* Title */
+                            WS_OVERLAPPEDWINDOW,          /* Style */
                             CW_USEDEFAULT, CW_USEDEFAULT, /* Position */
                             CW_USEDEFAULT, CW_USEDEFAULT, /* Size */
                             NULL,                         /* Parent */
                             NULL,                         /* No menu */
                             hinst,                        /* Instance */
-                            0); /* No special parameters */
+                            0);                           /* No special parameters */
         ShowWindow(hwnd, nShowCmd);
         while (GetMessage(&msg, NULL, 0, 0)) {
             TranslateMessage(&msg);
