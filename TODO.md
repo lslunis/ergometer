@@ -7,3 +7,5 @@
 - https://websockets.readthedocs.io/en/stable/intro.html
 - https://matplotlib.org/index.html
 - https://matplotlib.org/3.2.1/gallery/user_interfaces/mpl_with_glade3_sgskip.html#sphx-glr-gallery-user-interfaces-mpl-with-glade3-sgskip-py
+- https://alamot.github.io/shutdown_manager_transparent/
+- https://developer.gnome.org/pygtk/stable/class-gtkwidget.html#method-gtkwidget--set-events
