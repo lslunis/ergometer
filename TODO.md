@@ -12,3 +12,4 @@
 - https://www.gtk.org/docs/installations/windows/
 - https://github.com/lslunis/ergometer/blob/f14d7886cb104cb1a8a1ff58ec72eeb7c996f18d/colors.js
     - error:red, rest:orange, session:indigo, daily:teal
+- https://pip.pypa.io/en/stable/reference/pip_freeze/
