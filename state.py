@@ -47,6 +47,7 @@ class HostPosition(Base):
         return f"{self.host}:{self.position}"
 
 
+# TODO: rename to Setting
 class Target(Base):
     __tablename__ = "targets"
     id = Column(Integer, primary_key=True)
@@ -69,6 +70,7 @@ class Target(Base):
     def update_if_newer(self, target, time):
         if self.time < time:
             self.target = target
+            return True
 
 
 class Pause(Base):
@@ -100,13 +102,18 @@ class Pause(Base):
             rest_start=last_rest.start if last_rest else 0,
         )
 
-    # @staticmethod
-    # def daily(session, day):
-    #     return (
-    #         session.query(func.sum(Total.total))
-    #             .filter(is_on_day(Total.start, day))
-    #             .scalar()
-    #     )
+    @staticmethod
+    def daily_activity_total(session, day):
+        pauses = (
+            session.query(Pause)
+            .filter(Pause.start < day + 86400)  # drop pauses that are in the future
+            .filter(Pause.end > day)  # drops pauses that are in the past
+            .orderby(Pause.end)
+        )
+        total = 0
+        for i in range(1, len(pauses)):
+            total += pauses[i].start - pauses[i - 1].end
+        return total
 
 
 min_span = 15
@@ -166,11 +173,17 @@ class PauseUpdater:
         return total
 
 
+# TODO: rename kind to make it more specific
+
+
 class Kind(Enum):
     daily_target = 1
     session_target = 2
     rest_target = 3
     action = 4
+
+
+# TODO: rename state to reflect its functionality as cache
 
 
 @retry_on(PositionError)
@@ -186,7 +199,7 @@ def initialize_state(state, now, session):
     delta = {
         **Target.as_state(*session.query(Target)),
         "day": today,
-        "daily_total": Pause.daily(session, today),
+        "daily_total": Pause.daily_activity_total(session, today),
         **Pause.as_state(session),
     }
     host_positions = {hp.host: hp.position for hp in session.query(HostPosition)}
@@ -200,21 +213,37 @@ def update_state(now, session, host, data, position, *, day, daily_total, **stat
     if position != host_position.position:
         raise PositionError(f"expected {host_position}, got {position}")
     host_position.position += len(data)
+
+    updated_targets = set()
     today = day_of(now)
     if day != today:
-        pass
+        day = today
+        daily_total = None
+    pauses_changed = False
+    pause_updater = PauseUpdater(session)
+
     for kind_value, value, time in struct.iter_unpack("<BxxxIQ", data):
         kind = Kind(kind_value)
         if kind == Kind.action:
-            pass
+            increment = pause_updater.update(time, value)
+            if increment:
+                pauses_changed = True
+            if daily_total is not None and day == day_of(time):
+                # this could attribute the increment to the wrong day if
+                # activity occurs at day boundary, but it can only be wrong
+                # by less than min_idle seconds
+                daily_total += increment
         else:
             target = Target.get(session, kind)
-            target.update_if_newer(value, time)
-
-
-def merge_state(state, delta):
-    if state.get("day") == delta["day"]:
-        delta["daily_total"] += state.get("daily_total", 0)
+            if target.update_if_newer(value, time):
+                updated_targets.add(target)
+    delta = Target.as_state(*updated_targets)
+    if daily_total is None:
+        daily_total = Pause.daily_activity_total(session, today)
+    delta.update(day=day, daily_total=daily_total)
+    if pauses_changed:
+        delta.update(Pause.as_state(session))
+    session.commit()
     state.update(delta)
 
 
