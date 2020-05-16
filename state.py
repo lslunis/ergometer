@@ -58,7 +58,11 @@ class Target(Base):
         id = kind.value
         target = session.query(Target).get(id)
         if target is None:
-            target = Target(id=id, time=0)
+            defaults = {Kind.daily_target: 8 * 3600,
+                        Kind.session_target: 3600,
+                        Kind.rest_target: 5 * 60}
+            # TODO: get rid of magic numbers
+            target = Target(id=id, target=defaults[kind], time=0)
             session.add(target)
         return target
 
@@ -90,6 +94,7 @@ class Pause(Base):
     @staticmethod
     def as_state(session):
         rest_target = Target.get(session, Kind.rest_target).target
+        print(repr(rest_target))
         rests = (
             session.query(Pause)
             .order_by(Pause.end.desc())
@@ -184,6 +189,8 @@ class Kind(Enum):
 
 # TODO: rename state to reflect its functionality as cache
 
+data_format = "<BxxxIQ"
+
 
 @retry_on(PositionError)
 async def state_updater(state, broker):
@@ -210,6 +217,9 @@ def initialize_state(state, now, session):
 # TODO: rename all instances of "day" to "day_start"
 def update_state(state, now, session, host, data, position):
     host_position = session.query(HostPosition).get(host)
+    if not host_position:
+        host_position = HostPosition(host=host, position=0)
+        session.add(host_position)
     if position != host_position.position:
         raise PositionError(f"expected {host_position}, got {position}")
     host_position.position += len(data)
@@ -224,13 +234,13 @@ def update_state(state, now, session, host, data, position):
     pauses_changed = False
     pause_updater = PauseUpdater(session)
 
-    for kind_value, value, time in struct.iter_unpack("<BxxxIQ", data):
+    for kind_value, value, time in struct.iter_unpack(data_format, data):
         kind = Kind(kind_value)
         if kind == Kind.action:
             increment = pause_updater.update(time, value)
             if increment:
                 pauses_changed = True
-            if daily_total is not None and day == day_start_of(time):
+            if daily_total is not None and is_on_day(time, day):
                 # this could attribute the increment to the wrong day if
                 # activity occurs at day boundary, but it can only be wrong
                 # by less than min_idle seconds

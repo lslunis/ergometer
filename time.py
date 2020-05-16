@@ -5,9 +5,9 @@ from datetime import datetime, timedelta
 def day_start_of(dt, start_hour=4):
     if dt.hour < start_hour:
         dt -= timedelta(days=1)
-    return dt.replace(
+    return int(dt.replace(
         hour=start_hour, minute=0, second=0, microsecond=0, fold=0
-    ).timestamp()
+    ).timestamp())
 
 
 def is_on_day(time, day):
