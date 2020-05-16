@@ -1,4 +1,3 @@
-import datetime
 from enum import Enum
 from itertools import chain, islice, repeat
 from contextlib import contextmanager
@@ -7,8 +6,8 @@ import struct
 from sqlalchemy import Column, Integer, String, create_engine, event
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.sql import func
 
+from .time import day_start_of, is_on_day, imprecise_clock, max_time
 from .util import retry_on, PositionError, die_unless
 
 
@@ -191,11 +190,11 @@ async def state_updater(state, broker):
     Session = connect("sqlite:///state.db")
     host_positions = initialize_state(state, imprecise_clock(), Session())
     async for args in broker.subscribe(host_positions):
-        update_state(imprecise_clock(), Session(), *args, **state)
+        update_state(state, imprecise_clock(), Session(), *args)
 
 
 def initialize_state(state, now, session):
-    today = day_of(now)
+    today = day_start_of(now)
     delta = {
         **Target.as_state(*session.query(Target)),
         "day": today,
@@ -205,17 +204,20 @@ def initialize_state(state, now, session):
     host_positions = {hp.host: hp.position for hp in session.query(HostPosition)}
     session.commit()
     state.update(delta)
-    return state, host_positions
+    return host_positions
 
 
-def update_state(now, session, host, data, position, *, day, daily_total, **state):
+# TODO: rename all instances of "day" to "day_start"
+def update_state(state, now, session, host, data, position):
     host_position = session.query(HostPosition).get(host)
     if position != host_position.position:
         raise PositionError(f"expected {host_position}, got {position}")
     host_position.position += len(data)
 
     updated_targets = set()
-    today = day_of(now)
+    today = day_start_of(now)
+    day = state["day"]
+    daily_total = state["daily_total"]
     if day != today:
         day = today
         daily_total = None
@@ -228,7 +230,7 @@ def update_state(now, session, host, data, position, *, day, daily_total, **stat
             increment = pause_updater.update(time, value)
             if increment:
                 pauses_changed = True
-            if daily_total is not None and day == day_of(time):
+            if daily_total is not None and day == day_start_of(time):
                 # this could attribute the increment to the wrong day if
                 # activity occurs at day boundary, but it can only be wrong
                 # by less than min_idle seconds
@@ -266,28 +268,3 @@ def metrics_at(
         session_value=now - session_start if rest_value < rest_target else 0,
         rest_value=rest_value,
     )
-
-
-def day_of(dt):
-    return lower_bound_of(
-        dt.timestamp(), period=86400, offset=dt.utcoffset().total_seconds() + 4 * 3600,
-    )
-
-
-def is_on_day(time, day):
-    return day <= time < day + 86400
-
-
-def imprecise_clock():
-    return precise_clock().replace(microsecond=0)
-
-
-def precise_clock():
-    return datetime.datetime.now().astimezone()
-
-
-def lower_bound_of(value, *, period, offset=0):
-    return (value - offset) // period * period + offset
-
-
-max_time = 2 ** 48 - 1
