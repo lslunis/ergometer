@@ -7,7 +7,9 @@ def retry_on(Error):
         async def retry_loop(*args, **kwargs):
             while True:
                 try:
-                    loop(*args, **kwargs)
+                    await loop(*args, **kwargs)
+                except FatalError as fe:
+                    raise
                 except Error as e:
                     warn(e)
 
@@ -23,3 +25,7 @@ class PositionError(Exception):
 def die_unless(cond, message):
     if not cond:
         raise Exception(message)
+
+
+class FatalError(Exception):
+    pass

@@ -6,7 +6,7 @@ import os
 import os.path as path
 import sys
 import uuid
-
+from util import FatalError, die_unless, retry_on
 
 # trim at startup
 # mark irrecoverable data
@@ -16,9 +16,8 @@ class IntegrityError(Exception):
     pass
 
 
-# Read local events for "host", writing them to "broker"
+# Read local events for "host", writing them to "broker".
 async def publish_local_events(host, broker, file_manager):
-    print("publish_local_events")
     position = await broker.host_position(host)
     while True:
         data = await file_manager.read(host, position, 100)
@@ -26,40 +25,35 @@ async def publish_local_events(host, broker, file_manager):
         position = await broker.write(host, data, position)
 
 
-def check(check, msg):
-    if check:
-        return
-    print(msg, file=sys.stderr)
-    sys.exit(1)
-
-
 # Read local events from "event_queue" in groups of "batch_size"
-# and write them using "file_manager"
+# and write them using "file_manager".
+@retry_on(Exception)
 async def local_event_handler(host, event_queue, file_manager, batch_size):
-    while True:
-        to_write = [await event_queue.get()]
-        for _ in range(batch_size - 1):
-            if event_queue.empty():
-                break
-            # Make this a list
-            to_write.append(event_queue.get_nowait())
-        file_manager.write(host, to_write)
+    to_write = [await event_queue.get()]
+    for _ in range(batch_size - 1):
+        if event_queue.empty():
+            break
+        # Make this a list
+        to_write.append(event_queue.get_nowait())
+    file_manager.write(host, to_write)
 
 
 # Read all changes from "broker" for other hosts and write them using
-# "file_manager"
+# "file_manager".
+@retry_on(Exception)
 async def change_subscriber(self_host, broker, file_manager):
-    while True:
-        # Initialize.
-        positions = file_manager.positions
-        try:
-            # Read messages forever.
-            async for data_host, data, position in broker.read(
-                positions, exclude=self_host
-            ):
-                file_manager.write(data_host, data, position=position)
-        except Exception as e:
-            file_manager.log(e)
+    # Initialize.
+    positions = file_manager.positions
+    try:
+        # Read messages forever.
+        async for data_host, data, position in broker.read(
+            positions, exclude=self_host
+        ):
+            file_manager.write(data_host, data, position=position)
+    except FatalError as fe:
+        raise fe
+    except Exception as e:
+        file_manager.log(e)
 
 
 # A single file. Does error handling around reads and writes as well as
@@ -92,7 +86,7 @@ class HostFile:
     # data is an iterable of bytes objects.
     def write(self, data, position=None):
         for d in data:
-            check(type(d) == bytes, f"Got non-bytes data to write: {d}")
+            die_unless(type(d) == bytes, f"Got non-bytes data to write: {d}")
         # Open for reading and writing without truncating.
         with open(self.path, "rb+") as f:
             file_position = self.safe_seek(f)
@@ -107,7 +101,7 @@ class HostFile:
                     f"Tried to write {to_write_len} bytes to {self.path}, which is not divisible by 16"
                 )
             bytes_written = f.write(to_write)
-            check(
+            die_unless(
                 bytes_written == len(to_write), f"Failed to write to file {self.path}"
             )
             self.data_available.set()
@@ -119,19 +113,19 @@ class HostFile:
         with open(error_path, "a") as f:
             full_message = msg + "\n"
             byte_written = f.write(full_message)
-            check(
+            die_unless(
                 bytes_written == len(full_message),
                 f"Failed to write to error log {error_path}",
             )
         self.error_event.set()
 
     async def read(self, position, batch_size):
-        check(
+        die_unless(
             position % 16 == 0,
             f"Tried to read file {self.path} at position {position} which is not divisible by 16",
         )
         file_size = self.size
-        check(
+        die_unless(
             position <= file_size,
             f"Tried to read file {self.path} at position {position} which > {file_size}",
         )
@@ -225,7 +219,7 @@ async def run_subprocess(queue, command, args):
     )
     while True:
         data = await subprocess.stdout.read(16)
-        check(
+        die_unless(
             len(data) == 16,
             f"Did not get 16 bytes from subprocess {command}. Got: '{data}'",
         )
@@ -239,7 +233,7 @@ async def main():
 
     error_event = asyncio.Event()
     host = get_current_host(storage_root)
-    check(len(host) > 0, "host is empty")
+    die_unless(len(host) > 0, "host is empty")
     file_manager = FileManager(host, storage_root, error_event)
 
     # Set up cloud change manager.
