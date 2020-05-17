@@ -7,6 +7,8 @@
 #define STRICT
 #include <Windows.h>
 
+#include <algorithm>
+#include <array>
 #include <assert.h>
 #include <commctrl.h>
 #include <memory>
@@ -14,11 +16,16 @@
 #include <shlwapi.h>
 #include <strsafe.h>
 #include <windowsx.h>
+using namespace std;
 
 constexpr UINT_PTR IDT_TIMER1 = 1;
 
 HINSTANCE g_hinst; /* This application's HINSTANCE */
 HWND g_hwndChild;  /* Optional child window */
+
+bool g_wasActive = false;
+
+constexpr array g_buttonCountDenyList = {110u}; // both keyboards and mice
 
 /*
  *  OnSize
@@ -123,45 +130,16 @@ void OnInput([[maybe_unused]] HWND hwnd, [[maybe_unused]] WPARAM code,
         assert(false);
     }
 
-    if (input->header.dwType == RIM_TYPEKEYBOARD) {
-        TCHAR prefix[80];
-        prefix[0] = TEXT('\0');
-        if (input->data.keyboard.Flags & RI_KEY_E0) {
-            StringCchCat(prefix, ARRAYSIZE(prefix), TEXT("E0 "));
-        }
-        if (input->data.keyboard.Flags & RI_KEY_E1) {
-            StringCchCat(prefix, ARRAYSIZE(prefix), TEXT("E1 "));
-        }
+    const DWORD button_count = input->header.dwType == RIM_TYPEKEYBOARD
+                                   ? device_info.keyboard.dwNumberOfKeysTotal
+                                   : device_info.mouse.dwNumberOfButtons;
 
-        TCHAR buffer[256];
-        StringCchPrintf(buffer, ARRAYSIZE(buffer),
-                        TEXT("%p, msg=%04x, vk=%04x, scanCode=%s%02x, %s, "
-                             "dwNumberOfFunctionKeys %u, dwNumberOfIndicators %u, "
-                             "dwNumberOfKeysTotal %u"),
-                        input->header.hDevice, input->data.keyboard.Message,
-                        input->data.keyboard.VKey, prefix,
-                        input->data.keyboard.MakeCode,
-                        (input->data.keyboard.Flags & RI_KEY_BREAK) ? TEXT("release")
-                                                                    : TEXT("press"),
-                        device_info.keyboard.dwNumberOfFunctionKeys,
-                        device_info.keyboard.dwNumberOfIndicators,
-                        device_info.keyboard.dwNumberOfKeysTotal);
-        ListBox_AddString(g_hwndChild, buffer);
-    } else {
-        TCHAR buffer[256];
-        StringCchPrintf(
-            buffer, ARRAYSIZE(buffer),
-            TEXT("MOUSE %p, usFlags 0x%04x, usButtonFlags 0x%04x, usButtonData "
-                 "%d, ulRawButtons 0x%08x, lLastX %d, lLastY %d, "
-                 "ulExtraInformation 0x%08x, dwNumberOfButtons %u"),
-            input->header.hDevice, input->data.mouse.usFlags,
-            input->data.mouse.usButtonFlags,
-            static_cast<SHORT>(input->data.mouse.usButtonData),
-            input->data.mouse.ulRawButtons, input->data.mouse.lLastX,
-            input->data.mouse.lLastY, input->data.mouse.ulExtraInformation,
-            device_info.mouse.dwNumberOfButtons);
-        ListBox_AddString(g_hwndChild, buffer);
+    if (find(g_buttonCountDenyList.begin(), g_buttonCountDenyList.end(), button_count)
+        != g_buttonCountDenyList.end()) {
+        return; // skip keyboards/mice with denied button counts
     }
+
+    g_wasActive = true;
 }
 
 /*
@@ -207,7 +185,13 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uiMsg, WPARAM wParam, LPARAM lParam) {
         return 0;
 
     case WM_TIMER:
-        ListBox_AddString(g_hwndChild, TEXT("TIMER"));
+        if (g_wasActive) {
+            ListBox_AddString(g_hwndChild, TEXT("ACTIVE!"));
+            g_wasActive = false;
+        } else {
+            ListBox_AddString(g_hwndChild, TEXT("Zzzzzz."));
+        }
+
         return 0;
     }
     return DefWindowProc(hwnd, uiMsg, wParam, lParam);
