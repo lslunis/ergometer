@@ -9,7 +9,6 @@
 
 #include <algorithm>
 #include <array>
-#include <assert.h>
 #include <chrono>
 #include <commctrl.h>
 #include <memory>
@@ -99,6 +98,20 @@ struct Guard_DefRawInputProc {
     ~Guard_DefRawInputProc() { DefRawInputProc(&input, 1, sizeof(RAWINPUTHEADER)); }
 };
 
+bool check_equal_values(const char* const name1, const DWORD value1,
+                        const char* const name2, const DWORD value2) {
+    const bool eq = value1 == value2;
+
+    if (!eq) {
+        TCHAR buffer[256];
+        StringCchPrintf(buffer, ARRAYSIZE(buffer), TEXT("WARNING: %s (%u) != %s (%u)"),
+                        name1, value1, name2, value2);
+        ListBox_AddString(g_hwndChild, buffer);
+    }
+
+    return eq;
+}
+
 void OnInput([[maybe_unused]] HWND hwnd, [[maybe_unused]] WPARAM code,
              HRAWINPUT hRawInput) {
     UINT dwSize;
@@ -126,9 +139,16 @@ void OnInput([[maybe_unused]] HWND hwnd, [[maybe_unused]] WPARAM code,
     const UINT ret = GetRawInputDeviceInfoA(input->header.hDevice, RIDI_DEVICEINFO,
                                             &device_info, &cbSize);
 
-    if (ret != sizeof(device_info) || device_info.cbSize != sizeof(device_info)
-        || device_info.dwType != input->header.dwType) {
-        assert(false);
+    const bool eq1 = check_equal_values("ret", ret, "sizeof(device_info)",
+                                        static_cast<DWORD>(sizeof(device_info)));
+    const bool eq2 = check_equal_values("device_info.cbSize", device_info.cbSize,
+                                        "sizeof(device_info)",
+                                        static_cast<DWORD>(sizeof(device_info)));
+    const bool eq3 = check_equal_values("device_info.dwType", device_info.dwType,
+                                        "input->header.dwType", input->header.dwType);
+
+    if (!eq1 || !eq2 || !eq3) {
+        return; // avoid short-circuiting so that all warnings are printed
     }
 
     const DWORD button_count = input->header.dwType == RIM_TYPEKEYBOARD
