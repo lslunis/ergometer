@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <array>
 #include <assert.h>
+#include <chrono>
 #include <commctrl.h>
 #include <memory>
 #include <ole2.h>
@@ -184,15 +185,19 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uiMsg, WPARAM wParam, LPARAM lParam) {
         OnPrintClient(hwnd, (HDC)wParam);
         return 0;
 
-    case WM_TIMER:
-        if (g_wasActive) {
-            ListBox_AddString(g_hwndChild, TEXT("ACTIVE!"));
-            g_wasActive = false;
-        } else {
-            ListBox_AddString(g_hwndChild, TEXT("Zzzzzz."));
-        }
+    case WM_TIMER: {
+        using sc = chrono::system_clock;
+        const auto timestamp = sc::to_time_t(sc::now());
+
+        TCHAR buffer[256];
+        StringCchPrintf(buffer, ARRAYSIZE(buffer), TEXT("%s TIMESTAMP %lld"),
+                        g_wasActive ? "ACTIVE!" : "Zzzzzz.",
+                        static_cast<long long>(timestamp));
+        ListBox_AddString(g_hwndChild, buffer);
+        g_wasActive = false;
 
         return 0;
+    }
     }
     return DefWindowProc(hwnd, uiMsg, wParam, lParam);
 }
