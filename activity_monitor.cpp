@@ -1,6 +1,3 @@
-// g++ -Wall -Wextra -std=c++17 -mwindows activity_monitor.cpp -lcomctl32
-// -lole32 -o activity_monitor.exe
-
 // cl /EHsc /nologo /W4 /std:c++17 activity_monitor.cpp comctl32.lib ole32.lib
 // user32.lib
 
@@ -17,79 +14,32 @@
 #include <stdexcept>
 #include <stdio.h>
 #include <string>
-#include <strsafe.h>
 #include <vector>
 #include <windowsx.h>
 using namespace std;
 
 constexpr UINT_PTR IDT_TIMER1 = 1;
 
-HINSTANCE g_hinst; /* This application's HINSTANCE */
-HWND g_hwndChild;  /* Optional child window */
+HINSTANCE g_hinst;
 
 bool g_wasActive = false;
 
 vector<DWORD> g_buttonCountDenyList; // both keyboards and mice
 
-/*
- *  OnSize
- *      If we have an inner child, resize it to fit.
- */
-void OnSize([[maybe_unused]] HWND hwnd, [[maybe_unused]] UINT state, int cx, int cy) {
-    if (g_hwndChild) {
-        MoveWindow(g_hwndChild, 0, 0, cx, cy, TRUE);
-    }
+void register_for_raw_input(const HWND hwnd, const DWORD dwFlags) {
+    const RAWINPUTDEVICE dev[]{{1, 6, dwFlags, hwnd}, {1, 2, dwFlags, hwnd}};
+    RegisterRawInputDevices(dev, static_cast<UINT>(size(dev)), sizeof(dev[0]));
 }
 
-/*
- *  OnCreate
- *      Applications will typically override this and maybe even
- *      create a child window.
- */
-BOOL OnCreate(HWND hwnd, [[maybe_unused]] LPCREATESTRUCT lpcs) {
-    g_hwndChild = CreateWindow(TEXT("listbox"), NULL,
-                               LBS_HASSTRINGS | WS_CHILD | WS_VISIBLE | WS_VSCROLL, 0,
-                               0, 0, 0, hwnd, NULL, g_hinst, 0);
-
-    RAWINPUTDEVICE dev[2];
-    dev[0].usUsagePage = 1;
-    dev[0].usUsage = 6;
-    dev[0].dwFlags = RIDEV_INPUTSINK;
-    dev[0].hwndTarget = hwnd;
-
-    dev[1].usUsagePage = 1;
-    dev[1].usUsage = 2;
-    dev[1].dwFlags = RIDEV_INPUTSINK;
-    dev[1].hwndTarget = hwnd;
-
-    RegisterRawInputDevices(dev, sizeof(dev) / sizeof(dev[0]), sizeof(dev[0]));
-
+BOOL OnCreate(HWND hwnd, LPCREATESTRUCT) {
+    register_for_raw_input(hwnd, RIDEV_INPUTSINK);
     SetTimer(hwnd, IDT_TIMER1, 1000, nullptr);
-
     return TRUE;
 }
 
-/*
- *  OnDestroy
- *      Post a quit message because our application is over when the
- *      user closes this window.
- */
 void OnDestroy(HWND hwnd) {
-    RAWINPUTDEVICE dev[2];
-    dev[0].usUsagePage = 1;
-    dev[0].usUsage = 6;
-    dev[0].dwFlags = RIDEV_REMOVE;
-    dev[0].hwndTarget = hwnd;
-
-    dev[1].usUsagePage = 1;
-    dev[1].usUsage = 2;
-    dev[1].dwFlags = RIDEV_REMOVE;
-    dev[1].hwndTarget = hwnd;
-
-    RegisterRawInputDevices(dev, sizeof(dev) / sizeof(dev[0]), sizeof(dev[0]));
-
+    register_for_raw_input(hwnd, RIDEV_REMOVE);
     KillTimer(hwnd, IDT_TIMER1);
-
     PostQuitMessage(0);
 }
 
@@ -165,46 +115,13 @@ void OnInput([[maybe_unused]] HWND hwnd, [[maybe_unused]] WPARAM code,
 }
 
 /*
- *  PaintContent
- *      Interesting things will be painted here eventually.
- */
-void PaintContent([[maybe_unused]] HWND hwnd, [[maybe_unused]] PAINTSTRUCT* pps) {}
-
-/*
- *  OnPaint
- *      Paint the content as part of the paint cycle.
- */
-void OnPaint(HWND hwnd) {
-    PAINTSTRUCT ps;
-    BeginPaint(hwnd, &ps);
-    PaintContent(hwnd, &ps);
-    EndPaint(hwnd, &ps);
-}
-
-/*
- *  OnPrintClient
- *      Paint the content as requested by USER.
- */
-void OnPrintClient(HWND hwnd, HDC hdc) {
-    PAINTSTRUCT ps;
-    ps.hdc = hdc;
-    GetClientRect(hwnd, &ps.rcPaint);
-    PaintContent(hwnd, &ps);
-}
-
-/*
  *  Window procedure
  */
 LRESULT CALLBACK WndProc(HWND hwnd, UINT uiMsg, WPARAM wParam, LPARAM lParam) {
     switch (uiMsg) {
         HANDLE_MSG(hwnd, WM_CREATE, OnCreate);
-        HANDLE_MSG(hwnd, WM_SIZE, OnSize);
         HANDLE_MSG(hwnd, WM_DESTROY, OnDestroy);
-        HANDLE_MSG(hwnd, WM_PAINT, OnPaint);
         HANDLE_MSG(hwnd, WM_INPUT, OnInput);
-    case WM_PRINTCLIENT:
-        OnPrintClient(hwnd, (HDC)wParam);
-        return 0;
 
     case WM_TIMER:
         if (g_wasActive) {
