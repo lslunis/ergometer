@@ -128,7 +128,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uiMsg, WPARAM wParam, LPARAM lParam) {
     return DefWindowProc(hwnd, uiMsg, wParam, lParam);
 }
 
-int WINAPI WinMain(HINSTANCE hinst, HINSTANCE, LPSTR lpCmdLine, int nShowCmd) {
+int WINAPI WinMain(HINSTANCE hinst, HINSTANCE, LPSTR lpCmdLine, int) {
     const regex digits{R"(\d+)"};
     const string strCmdLine{lpCmdLine};
     for (sregex_token_iterator it(strCmdLine.begin(), strCmdLine.end(), digits), end;
@@ -144,36 +144,18 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE, LPSTR lpCmdLine, int nShowCmd) {
 
     g_hinst = hinst;
 
-    {
-        WNDCLASS wc;
-        wc.style = 0;
-        wc.lpfnWndProc = WndProc;
-        wc.cbClsExtra = 0;
-        wc.cbWndExtra = 0;
-        wc.hInstance = g_hinst;
-        wc.hIcon = NULL;
-        wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-        wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-        wc.lpszMenuName = NULL;
-        wc.lpszClassName = L"ActivityMonitor";
-        if (!RegisterClass(&wc)) {
-            return 0;
-        }
+    const WNDCLASS wc{0,       WndProc, 0,       0,       g_hinst,
+                      nullptr, nullptr, nullptr, nullptr, L"ActivityMonitor"};
+
+    if (!RegisterClass(&wc)) {
+        fprintf(stderr, "RegisterClass failed.\n");
+        return 0;
     }
 
-    HWND hwnd = CreateWindow(L"ActivityMonitor",           // Class Name
-                             L"ActivityMonitor",           // Title
-                             WS_OVERLAPPEDWINDOW,          // Style
-                             CW_USEDEFAULT, CW_USEDEFAULT, // Position
-                             CW_USEDEFAULT, CW_USEDEFAULT, // Size
-                             NULL,                         // Parent
-                             NULL,                         // No menu
-                             hinst,                        // Instance
-                             0);                           // No special parameters
-    ShowWindow(hwnd, nShowCmd);
+    CreateWindow(L"ActivityMonitor", L"", 0, 0, 0, 0, 0, nullptr, nullptr, hinst, 0);
 
     MSG msg;
-    while (GetMessage(&msg, NULL, 0, 0)) {
+    while (GetMessage(&msg, nullptr, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
