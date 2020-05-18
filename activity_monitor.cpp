@@ -1,14 +1,12 @@
-// cl /EHsc /nologo /W4 /std:c++17 activity_monitor.cpp comctl32.lib ole32.lib
-// user32.lib
+// cl /EHsc /nologo /W4 /std:c++17 activity_monitor.cpp user32.lib &&
+// (activity_monitor 110 > stdout.txt 2> stderr.txt)
 
 #define STRICT
 #include <Windows.h>
 
 #include <algorithm>
 #include <chrono>
-#include <commctrl.h>
 #include <memory>
-#include <ole2.h>
 #include <regex>
 #include <shlwapi.h>
 #include <stdexcept>
@@ -137,7 +135,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uiMsg, WPARAM wParam, LPARAM lParam) {
     return DefWindowProc(hwnd, uiMsg, wParam, lParam);
 }
 
-BOOL InitApp(void) {
+BOOL InitApp() {
     WNDCLASS wc;
     wc.style = 0;
     wc.lpfnWndProc = WndProc;
@@ -149,9 +147,9 @@ BOOL InitApp(void) {
     wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
     wc.lpszMenuName = NULL;
     wc.lpszClassName = TEXT("Scratch");
-    if (!RegisterClass(&wc))
+    if (!RegisterClass(&wc)) {
         return FALSE;
-    InitCommonControls(); /* In case we use a common control */
+    }
     return TRUE;
 }
 
@@ -174,24 +172,24 @@ int WINAPI WinMain(HINSTANCE hinst, [[maybe_unused]] HINSTANCE hinstPrev,
     MSG msg;
     HWND hwnd;
     g_hinst = hinst;
-    if (!InitApp())
+    if (!InitApp()) {
         return 0;
-    if (SUCCEEDED(CoInitialize(NULL))) {                  /* In case we use COM */
-        hwnd = CreateWindow(TEXT("Scratch"),              /* Class Name */
-                            TEXT("Scratch"),              /* Title */
-                            WS_OVERLAPPEDWINDOW,          /* Style */
-                            CW_USEDEFAULT, CW_USEDEFAULT, /* Position */
-                            CW_USEDEFAULT, CW_USEDEFAULT, /* Size */
-                            NULL,                         /* Parent */
-                            NULL,                         /* No menu */
-                            hinst,                        /* Instance */
-                            0);                           /* No special parameters */
-        ShowWindow(hwnd, nShowCmd);
-        while (GetMessage(&msg, NULL, 0, 0)) {
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
-        }
-        CoUninitialize();
     }
+
+    hwnd = CreateWindow(TEXT("Scratch"),              /* Class Name */
+                        TEXT("Scratch"),              /* Title */
+                        WS_OVERLAPPEDWINDOW,          /* Style */
+                        CW_USEDEFAULT, CW_USEDEFAULT, /* Position */
+                        CW_USEDEFAULT, CW_USEDEFAULT, /* Size */
+                        NULL,                         /* Parent */
+                        NULL,                         /* No menu */
+                        hinst,                        /* Instance */
+                        0);                           /* No special parameters */
+    ShowWindow(hwnd, nShowCmd);
+    while (GetMessage(&msg, NULL, 0, 0)) {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+
     return 0;
 }
