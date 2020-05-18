@@ -1,19 +1,20 @@
 // cl /EHsc /nologo /W4 /std:c++17 activity_monitor.cpp user32.lib &&
 // (activity_monitor 110 > stdout.txt 2> stderr.txt)
 
+#define NOMINMAX
 #define STRICT
+#define UNICODE
+#define _UNICODE
 #include <Windows.h>
 
 #include <algorithm>
 #include <chrono>
 #include <memory>
 #include <regex>
-#include <shlwapi.h>
 #include <stdexcept>
 #include <stdio.h>
 #include <string>
 #include <vector>
-#include <windowsx.h>
 using namespace std;
 
 constexpr UINT_PTR IDT_TIMER1 = 1;
@@ -23,26 +24,6 @@ HINSTANCE g_hinst;
 bool g_wasActive = false;
 
 vector<DWORD> g_buttonCountDenyList; // both keyboards and mice
-
-void register_for_raw_input(const HWND hwnd, const DWORD dwFlags) {
-    const RAWINPUTDEVICE dev[]{{1, 6, dwFlags, hwnd}, {1, 2, dwFlags, hwnd}};
-    RegisterRawInputDevices(dev, static_cast<UINT>(size(dev)), sizeof(dev[0]));
-}
-
-BOOL OnCreate(HWND hwnd, LPCREATESTRUCT) {
-    register_for_raw_input(hwnd, RIDEV_INPUTSINK);
-    SetTimer(hwnd, IDT_TIMER1, 1000, nullptr);
-    return TRUE;
-}
-
-void OnDestroy(HWND hwnd) {
-    register_for_raw_input(hwnd, RIDEV_REMOVE);
-    KillTimer(hwnd, IDT_TIMER1);
-    PostQuitMessage(0);
-}
-
-#define HANDLE_WM_INPUT(hwnd, wParam, lParam, fn)                                      \
-    ((fn)((hwnd), GET_RAWINPUT_CODE_WPARAM(wParam), (HRAWINPUT)(lParam)), 0)
 
 struct Guard_DefRawInputProc {
     RAWINPUT* input;
@@ -61,11 +42,10 @@ bool check_equal_values(const char* const name1, const DWORD value1,
     return eq;
 }
 
-void OnInput([[maybe_unused]] HWND hwnd, [[maybe_unused]] WPARAM code,
-             HRAWINPUT hRawInput) {
+void OnInput(HRAWINPUT hRawInput) {
     UINT dwSize;
     GetRawInputData(hRawInput, RID_INPUT, nullptr, &dwSize, sizeof(RAWINPUTHEADER));
-    auto storage = std::make_unique<unsigned char[]>(dwSize);
+    const auto storage = make_unique<unsigned char[]>(dwSize);
     RAWINPUT* input = reinterpret_cast<RAWINPUT*>(storage.get());
     Guard_DefRawInputProc guard{input};
 
@@ -85,8 +65,8 @@ void OnInput([[maybe_unused]] HWND hwnd, [[maybe_unused]] WPARAM code,
     RID_DEVICE_INFO device_info{};
     device_info.cbSize = sizeof(device_info);
     UINT cbSize = sizeof(device_info);
-    const UINT ret = GetRawInputDeviceInfoA(input->header.hDevice, RIDI_DEVICEINFO,
-                                            &device_info, &cbSize);
+    const UINT ret = GetRawInputDeviceInfo(input->header.hDevice, RIDI_DEVICEINFO,
+                                           &device_info, &cbSize);
 
     const bool eq1 = check_equal_values("ret", ret, "sizeof(device_info)",
                                         static_cast<DWORD>(sizeof(device_info)));
@@ -112,14 +92,27 @@ void OnInput([[maybe_unused]] HWND hwnd, [[maybe_unused]] WPARAM code,
     g_wasActive = true;
 }
 
-/*
- *  Window procedure
- */
+void register_for_raw_input(const HWND hwnd, const DWORD dwFlags) {
+    const RAWINPUTDEVICE dev[]{{1, 6, dwFlags, hwnd}, {1, 2, dwFlags, hwnd}};
+    RegisterRawInputDevices(dev, static_cast<UINT>(size(dev)), sizeof(dev[0]));
+}
+
 LRESULT CALLBACK WndProc(HWND hwnd, UINT uiMsg, WPARAM wParam, LPARAM lParam) {
     switch (uiMsg) {
-        HANDLE_MSG(hwnd, WM_CREATE, OnCreate);
-        HANDLE_MSG(hwnd, WM_DESTROY, OnDestroy);
-        HANDLE_MSG(hwnd, WM_INPUT, OnInput);
+    case WM_CREATE:
+        register_for_raw_input(hwnd, RIDEV_INPUTSINK);
+        SetTimer(hwnd, IDT_TIMER1, 1000, nullptr);
+        return 0;
+
+    case WM_DESTROY:
+        register_for_raw_input(hwnd, RIDEV_REMOVE);
+        KillTimer(hwnd, IDT_TIMER1);
+        PostQuitMessage(0);
+        return 0;
+
+    case WM_INPUT:
+        OnInput(reinterpret_cast<HRAWINPUT>(lParam));
+        return 0;
 
     case WM_TIMER:
         if (g_wasActive) {
@@ -146,16 +139,14 @@ BOOL InitApp() {
     wc.hCursor = LoadCursor(NULL, IDC_ARROW);
     wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
     wc.lpszMenuName = NULL;
-    wc.lpszClassName = TEXT("Scratch");
+    wc.lpszClassName = L"ActivityMonitor";
     if (!RegisterClass(&wc)) {
         return FALSE;
     }
     return TRUE;
 }
 
-int WINAPI WinMain(HINSTANCE hinst, [[maybe_unused]] HINSTANCE hinstPrev,
-                   LPSTR lpCmdLine, int nShowCmd) {
-
+int WINAPI WinMain(HINSTANCE hinst, HINSTANCE, LPSTR lpCmdLine, int nShowCmd) {
     const regex digits{R"(\d+)"};
     const string strCmdLine{lpCmdLine};
     for (sregex_token_iterator it(strCmdLine.begin(), strCmdLine.end(), digits), end;
@@ -176,15 +167,15 @@ int WINAPI WinMain(HINSTANCE hinst, [[maybe_unused]] HINSTANCE hinstPrev,
         return 0;
     }
 
-    hwnd = CreateWindow(TEXT("Scratch"),              /* Class Name */
-                        TEXT("Scratch"),              /* Title */
-                        WS_OVERLAPPEDWINDOW,          /* Style */
-                        CW_USEDEFAULT, CW_USEDEFAULT, /* Position */
-                        CW_USEDEFAULT, CW_USEDEFAULT, /* Size */
-                        NULL,                         /* Parent */
-                        NULL,                         /* No menu */
-                        hinst,                        /* Instance */
-                        0);                           /* No special parameters */
+    hwnd = CreateWindow(L"ActivityMonitor",           // Class Name
+                        L"ActivityMonitor",           // Title
+                        WS_OVERLAPPEDWINDOW,          // Style
+                        CW_USEDEFAULT, CW_USEDEFAULT, // Position
+                        CW_USEDEFAULT, CW_USEDEFAULT, // Size
+                        NULL,                         // Parent
+                        NULL,                         // No menu
+                        hinst,                        // Instance
+                        0);                           // No special parameters
     ShowWindow(hwnd, nShowCmd);
     while (GetMessage(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);
