@@ -8,13 +8,16 @@
 #include <Windows.h>
 
 #include <algorithm>
-#include <array>
 #include <chrono>
 #include <commctrl.h>
 #include <memory>
 #include <ole2.h>
+#include <regex>
 #include <shlwapi.h>
+#include <stdexcept>
+#include <string>
 #include <strsafe.h>
+#include <vector>
 #include <windowsx.h>
 using namespace std;
 
@@ -25,7 +28,7 @@ HWND g_hwndChild;  /* Optional child window */
 
 bool g_wasActive = false;
 
-constexpr array g_buttonCountDenyList = {110u}; // both keyboards and mice
+vector<DWORD> g_buttonCountDenyList; // both keyboards and mice
 
 /*
  *  OnSize
@@ -241,7 +244,20 @@ BOOL InitApp(void) {
 }
 
 int WINAPI WinMain(HINSTANCE hinst, [[maybe_unused]] HINSTANCE hinstPrev,
-                   [[maybe_unused]] LPSTR lpCmdLine, int nShowCmd) {
+                   LPSTR lpCmdLine, int nShowCmd) {
+
+    const regex digits{R"(\d+)"};
+    const string strCmdLine{lpCmdLine};
+    for (sregex_token_iterator it(strCmdLine.begin(), strCmdLine.end(), digits), end;
+         it != end; ++it) {
+        try {
+            g_buttonCountDenyList.push_back(static_cast<DWORD>(stoi(*it)));
+        } catch (const out_of_range&) {
+            // ignore enormous values
+            // TODO: print warning to stderr
+        }
+    }
+
     MSG msg;
     HWND hwnd;
     g_hinst = hinst;
