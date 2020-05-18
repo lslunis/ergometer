@@ -128,24 +128,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uiMsg, WPARAM wParam, LPARAM lParam) {
     return DefWindowProc(hwnd, uiMsg, wParam, lParam);
 }
 
-BOOL InitApp() {
-    WNDCLASS wc;
-    wc.style = 0;
-    wc.lpfnWndProc = WndProc;
-    wc.cbClsExtra = 0;
-    wc.cbWndExtra = 0;
-    wc.hInstance = g_hinst;
-    wc.hIcon = NULL;
-    wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-    wc.lpszMenuName = NULL;
-    wc.lpszClassName = L"ActivityMonitor";
-    if (!RegisterClass(&wc)) {
-        return FALSE;
-    }
-    return TRUE;
-}
-
 int WINAPI WinMain(HINSTANCE hinst, HINSTANCE, LPSTR lpCmdLine, int nShowCmd) {
     const regex digits{R"(\d+)"};
     const string strCmdLine{lpCmdLine};
@@ -160,23 +142,37 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE, LPSTR lpCmdLine, int nShowCmd) {
         }
     }
 
-    MSG msg;
-    HWND hwnd;
     g_hinst = hinst;
-    if (!InitApp()) {
-        return 0;
+
+    {
+        WNDCLASS wc;
+        wc.style = 0;
+        wc.lpfnWndProc = WndProc;
+        wc.cbClsExtra = 0;
+        wc.cbWndExtra = 0;
+        wc.hInstance = g_hinst;
+        wc.hIcon = NULL;
+        wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+        wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+        wc.lpszMenuName = NULL;
+        wc.lpszClassName = L"ActivityMonitor";
+        if (!RegisterClass(&wc)) {
+            return 0;
+        }
     }
 
-    hwnd = CreateWindow(L"ActivityMonitor",           // Class Name
-                        L"ActivityMonitor",           // Title
-                        WS_OVERLAPPEDWINDOW,          // Style
-                        CW_USEDEFAULT, CW_USEDEFAULT, // Position
-                        CW_USEDEFAULT, CW_USEDEFAULT, // Size
-                        NULL,                         // Parent
-                        NULL,                         // No menu
-                        hinst,                        // Instance
-                        0);                           // No special parameters
+    HWND hwnd = CreateWindow(L"ActivityMonitor",           // Class Name
+                             L"ActivityMonitor",           // Title
+                             WS_OVERLAPPEDWINDOW,          // Style
+                             CW_USEDEFAULT, CW_USEDEFAULT, // Position
+                             CW_USEDEFAULT, CW_USEDEFAULT, // Size
+                             NULL,                         // Parent
+                             NULL,                         // No menu
+                             hinst,                        // Instance
+                             0);                           // No special parameters
     ShowWindow(hwnd, nShowCmd);
+
+    MSG msg;
     while (GetMessage(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
