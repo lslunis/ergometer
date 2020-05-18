@@ -15,6 +15,7 @@
 #include <regex>
 #include <shlwapi.h>
 #include <stdexcept>
+#include <stdio.h>
 #include <string>
 #include <strsafe.h>
 #include <vector>
@@ -106,10 +107,7 @@ bool check_equal_values(const char* const name1, const DWORD value1,
     const bool eq = value1 == value2;
 
     if (!eq) {
-        TCHAR buffer[256];
-        StringCchPrintf(buffer, ARRAYSIZE(buffer), TEXT("WARNING: %s (%u) != %s (%u)"),
-                        name1, value1, name2, value2);
-        ListBox_AddString(g_hwndChild, buffer);
+        fprintf(stderr, "%s (%u) != %s (%u)\n", name1, value1, name2, value2);
     }
 
     return eq;
@@ -208,19 +206,16 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uiMsg, WPARAM wParam, LPARAM lParam) {
         OnPrintClient(hwnd, (HDC)wParam);
         return 0;
 
-    case WM_TIMER: {
-        using sc = chrono::system_clock;
-        const auto timestamp = sc::to_time_t(sc::now());
-
-        TCHAR buffer[256];
-        StringCchPrintf(buffer, ARRAYSIZE(buffer), TEXT("%s TIMESTAMP %lld"),
-                        g_wasActive ? "ACTIVE!" : "Zzzzzz.",
-                        static_cast<long long>(timestamp));
-        ListBox_AddString(g_hwndChild, buffer);
-        g_wasActive = false;
+    case WM_TIMER:
+        if (g_wasActive) {
+            using sc = chrono::system_clock;
+            const auto timestamp = sc::to_time_t(sc::now());
+            printf("%lld\n", static_cast<long long>(timestamp));
+            fflush(stdout);
+            g_wasActive = false;
+        }
 
         return 0;
-    }
     }
     return DefWindowProc(hwnd, uiMsg, wParam, lParam);
 }
@@ -250,11 +245,12 @@ int WINAPI WinMain(HINSTANCE hinst, [[maybe_unused]] HINSTANCE hinstPrev,
     const string strCmdLine{lpCmdLine};
     for (sregex_token_iterator it(strCmdLine.begin(), strCmdLine.end(), digits), end;
          it != end; ++it) {
+        const ssub_match sm = *it;
         try {
-            g_buttonCountDenyList.push_back(static_cast<DWORD>(stoi(*it)));
+            g_buttonCountDenyList.push_back(static_cast<DWORD>(stoi(sm)));
         } catch (const out_of_range&) {
-            // ignore enormous values
-            // TODO: print warning to stderr
+            fprintf(stderr, "Ignoring out-of-range command-line argument '%s'.\n",
+                    sm.str().c_str());
         }
     }
 
