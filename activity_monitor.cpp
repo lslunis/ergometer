@@ -1,6 +1,3 @@
-// cl /EHsc /nologo /W4 /std:c++17 activity_monitor.cpp user32.lib &&
-// (activity_monitor 110 > stdout.txt 2> stderr.txt)
-
 #define NOMINMAX
 #define STRICT
 #define UNICODE
