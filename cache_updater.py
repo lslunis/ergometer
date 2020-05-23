@@ -55,11 +55,17 @@ class Setting(Base):
 
     @staticmethod
     def get(session, event_type):
+        die_unless(event_type.default_value, f"unexpected: {event_type}")
         id = event_type.value
         setting = session.query(Setting).get(id)
-        if setting is None:
+        exists = setting is not None
+        if not exists:
             setting = Setting(id=id, value=event_type.default_value, time=0)
             session.add(setting)
+        if event_type == EventType.rest_target:
+            if exists:
+                session.execute("DROP INDEX rests")
+            session.execute(f"CREATE INDEX rests ON pauses(end) WHERE end - start >= {setting.value}")
         return setting
 
     @property
@@ -89,7 +95,6 @@ class Pause(Base):
     @staticmethod
     def session_interval_cache(session):
         rest_target = Setting.get(session, EventType.rest_target).value
-        print(repr(rest_target))
         rests = (
             session.query(Pause)
             .order_by(Pause.end.desc())
