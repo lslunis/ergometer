@@ -22,7 +22,7 @@ async def read_with_host(file_manager, host, position, batch_size):
 
 
 # Handles "read" calls. Sends an unending stream of data to a client.
-async def send_updates(file_manager, websocket, client_positions):
+async def send_updates(file_manager, websocket, client_positions, exclude=None):
     while True:
         pending = set(
             [
@@ -30,6 +30,7 @@ async def send_updates(file_manager, websocket, client_positions):
                 for host, pos in merge_positions(
                     client_positions, file_manager.positions
                 ).items()
+                if host != exclude
             ]
         )
         pending.add(file_manager.new_file.wait())
@@ -76,11 +77,30 @@ def client_handler(file_manager):
     async def handle_client(websocket, path):
         try:
             async for message in websocket:
-                data = json.loads(message)
-                if data["action"] == "read":
+                msg = json.loads(message)
+                if msg["action"] == "read":
                     asyncio.create_task(
-                        send_updates(file_manager, websocket, data["positions"])
+                        send_updates(
+                            file_manager,
+                            websocket,
+                            msg["positions"],
+                            msg.get("exclude", None),
+                        )
                     )
+                elif msg["action"] == "write":
+                    raw_data = base64.b64decode(msg["data"])
+                    file_manager.write(
+                        msg["host"], [raw_data], position=msg["pos"],
+                    )
+                    resp = json.dumps({"pos": msg["pos"] + len(raw_data)})
+                    await websocket.send(resp)
+
+                elif msg["action"] == "host_position":
+                    pos = file_manager.positions.get(msg["host"], 0)
+                    resp = json.dumps({"pos": pos})
+                    await websocket.send(resp)
+                else:
+                    raise FatalError("Unknown action type in message: {msg}")
         except websockets.exceptions.ConnectionClosedError:
             pass
 

@@ -199,7 +199,10 @@ class BrokerClient:
 
     async def read(self, positions, exclude=None):
         async with websockets.connect(self.address) as websocket:
-            await websocket.send(json.dumps({"action": "read", "positions": positions}))
+            msg = {"action": "read", "positions": positions}
+            if exclude is not None:
+                msg["exclude"] = exclude
+            await websocket.send(json.dumps(msg))
             while True:
                 msg = await websocket.recv()
                 resp = json.loads(msg)
@@ -210,12 +213,25 @@ class BrokerClient:
                 )
 
     async def write(self, host, data, position):
-        # returns the position of the broker for this host.
-        await asyncio.sleep(1)
-        return position + len(data)
+        async with websockets.connect(self.address) as websocket:
+            await websocket.send(
+                json.dumps(
+                    {
+                        "action": "write",
+                        "data": base64.b64encode(data).decode("ascii"),
+                        "pos": position,
+                        "host": host,
+                    }
+                )
+            )
+            resp = json.loads(await websocket.recv())
+            return resp["pos"]
 
     async def host_position(self, host):
-        return 0
+        async with websockets.connect(self.address) as websocket:
+            await websocket.send(json.dumps({"action": "host_position", "host": host}))
+            resp = json.loads(await websocket.recv())
+            return resp["pos"]
 
 
 def get_current_host(storage_root):
