@@ -1,14 +1,6 @@
-from .cache_updater import connect, min_span, Pause, PauseUpdater
+from .cache_updater import connect, Pause, PauseUpdater
+from .pause_test_util import add_pauses
 from .time import max_time
-
-
-def add_pauses(session, *times):
-    assert len(times) % 2 == 0
-    times = [0, *times, max_time]
-    for i in range(0, len(times), 2):
-        start, end = times[i : i + 2]
-        assert end - start >= min_span
-        session.add(Pause(start=start, end=end))
 
 
 def assert_pauses(session, *time_pairs):

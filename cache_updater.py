@@ -65,8 +65,9 @@ class Setting(Base):
         if event_type == EventType.rest_target:
             if exists:
                 session.execute("DROP INDEX rests")
+            rest_target = setting.value
             session.execute(
-                f"CREATE INDEX rests ON pauses(end) WHERE end - start >= {setting.value}"
+                f"CREATE INDEX rests ON pauses(end) WHERE end - start >= {rest_target}"
             )
         return setting
 
@@ -115,11 +116,14 @@ class Pause(Base):
             session.query(Pause)
             .filter(Pause.start < day_end)  # drop pauses that are in the future
             .filter(Pause.end > day_start)  # drops pauses that are in the past
-            .orderby(Pause.end)
+            .order_by(Pause.end)
         )
         total = 0
-        for i in range(1, len(pauses)):
-            total += pauses[i].start - pauses[i - 1].end
+        prior_pause = None
+        for pause in pauses:
+            if prior_pause:
+                total += pause.start - prior_pause.end
+            prior_pause = pause
         return total
 
 
@@ -224,6 +228,8 @@ def initialize_cache(cache, now, session):
     return host_positions
 
 
+# TODO: split the host position part of update_cache into another function
+# TODO: rename the test
 def update_cache(cache, now, session, host, data, position):
     host_position = session.query(HostPosition).get(host)
     if not host_position:
