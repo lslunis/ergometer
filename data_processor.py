@@ -1,3 +1,6 @@
+import base64
+import json
+import websockets
 import platform
 import asyncio
 import asyncio.subprocess
@@ -49,11 +52,11 @@ async def change_subscriber(self_host, broker, file_manager):
         async for data_host, data, position in broker.read(
             positions, exclude=self_host
         ):
-            file_manager.write(data_host, data, position=position)
+            file_manager.write(data_host, [data], position=position)
     except FatalError as fe:
         raise fe
     except Exception as e:
-        file_manager.log(e)
+        file_manager.log(str(e))
 
 
 # A single file. Does error handling around reads and writes as well as
@@ -86,7 +89,7 @@ class HostFile:
     # data is an iterable of bytes objects.
     def write(self, data, position=None):
         for d in data:
-            die_unless(type(d) == bytes, f"Got non-bytes data to write: {d}")
+            die_unless(type(d) == bytes, f"Got {d} of non-bytes data to write")
         # Open for reading and writing without truncating.
         with open(self.path, "rb+") as f:
             file_position = self.safe_seek(f)
@@ -106,18 +109,6 @@ class HostFile:
             )
             self.data_available.set()
             self.data_available = asyncio.Event()
-
-    # Log an error message. A newline is automatically appended.
-    def log(self, msg):
-        error_path = os.path.join(self.storage_root, "error.log")
-        with open(error_path, "a") as f:
-            full_message = msg + "\n"
-            byte_written = f.write(full_message)
-            die_unless(
-                bytes_written == len(full_message),
-                f"Failed to write to error log {error_path}",
-            )
-        self.error_event.set()
 
     async def read(self, position, batch_size):
         die_unless(
@@ -158,12 +149,30 @@ class FileManager:
         self.host = host
         self.error_event = error_event
         self.hosts = {}
+        self.new_file = asyncio.Event()
         for host_path in glob.glob(self.host_path("*")):
-            host, _, _ = host_path.rpartition(".hostlog")
-            self.hosts[host] = HostFile(host_path, self.error_event)
+            host, _, _ = path.basename(host_path).rpartition(".hostlog")
+            self.add_file(host, host_path)
+
+    def add_file(self, host, host_path):
+        self.hosts[host] = HostFile(host_path, self.error_event)
+        self.new_file.set()
+        self.new_file = asyncio.Event()
 
     def host_path(self, host):
         return os.path.join(self.storage_root, f"{host}.hostlog")
+
+    # Log an error message. A newline is automatically appended.
+    def log(self, msg):
+        error_path = os.path.join(self.storage_root, "error.log")
+        with open(error_path, "a") as f:
+            full_message = msg + "\n"
+            bytes_written = f.write(full_message)
+            die_unless(
+                bytes_written == len(full_message),
+                f"Failed to write to error log {error_path}",
+            )
+        self.error_event.set()
 
     @property
     def positions(self):
@@ -174,12 +183,12 @@ class FileManager:
 
     def write(self, host, data, position=None):
         if host not in self.hosts:
-            self.hosts[host] = HostFile(self.host_path(host), self.error_event)
+            self.add_file(host, self.host_path(host))
         self.hosts[host].write(data, position)
 
     async def read(self, host, position, batch_size):
         if host not in self.hosts:
-            self.hosts[host] = HostFile(self.host_path(host), self.error_event)
+            self.add_file(host, self.host_path(host))
         return await self.hosts[host].read(position, batch_size)
 
 
@@ -189,9 +198,16 @@ class BrokerClient:
         self.queue = asyncio.Queue(maxsize=1000)
 
     async def read(self, positions, exclude=None):
-        # yields (host, data, position) tuples
-        await asyncio.sleep(99999)
-        yield (host, data, position)
+        async with websockets.connect(self.address) as websocket:
+            await websocket.send(json.dumps({"action": "read", "positions": positions}))
+            while True:
+                msg = await websocket.recv()
+                resp = json.loads(msg)
+                yield (
+                    resp["host"],
+                    base64.b64decode(resp["data"]),
+                    resp["pos"],
+                )
 
     async def write(self, host, data, position):
         # returns the position of the broker for this host.
@@ -225,38 +241,3 @@ async def run_subprocess(queue, command, args):
         )
         await asyncio.sleep(0.5)
         await queue.put(data)
-
-
-async def main():
-    storage_root = sys.argv[1]
-    cloud_broker_address = sys.argv[2]
-
-    error_event = asyncio.Event()
-    host = get_current_host(storage_root)
-    die_unless(len(host) > 0, "host is empty")
-    file_manager = FileManager(host, storage_root, error_event)
-
-    # Set up cloud change manager.
-    broker = BrokerClient(cloud_broker_address)
-    subscriber = asyncio.create_task(change_subscriber(host, broker, file_manager))
-
-    # Set up the local change publisher.
-    publisher = asyncio.create_task(publish_local_events(host, broker, file_manager))
-
-    # Set up a subprocess listener
-    subprocess_queue = asyncio.Queue()
-    subprocess = asyncio.create_task(
-        run_subprocess(subprocess_queue, "cat", ["/dev/random"])
-    )
-    local_events = asyncio.create_task(
-        local_event_handler(host, subprocess_queue, file_manager, 100)
-    )
-
-    await asyncio.gather(subscriber, publisher, subprocess, local_events)
-
-
-if __name__ == "__main__":
-    if platform.system() == "Windows":
-        loop = asyncio.ProactorEventLoop()
-        asyncio.set_event_loop(loop)
-    asyncio.get_event_loop().run_until_complete(main())
