@@ -1,14 +1,16 @@
 from datetime import datetime
 import struct
 
-from .cache_updater import *
+from .cache_updater import connect, data_format, EventType, HostPosition, update_cache
+from .time import day_start_of
+from .util import PositionError
 
 now = datetime(year=2020, month=5, day=16)
 sample_host = "abcdefghi"
 
 
-def pack_data(kind, value, dt):
-    return struct.pack(data_format, kind.value, value, int(dt.timestamp()))
+def pack_data(event_type, value, dt):
+    return struct.pack(data_format, event_type.value, value, int(dt.timestamp()))
 
 
 sample_data = pack_data(EventType.action, 1, now)

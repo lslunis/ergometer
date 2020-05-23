@@ -1,4 +1,5 @@
-from .cache_updater import *
+from .cache_updater import connect, min_span, Pause, PauseUpdater
+from .time import max_time
 
 
 def add_pauses(session, *times):
