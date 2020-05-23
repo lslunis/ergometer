@@ -20,13 +20,13 @@ async def main():
     publisher = asyncio.create_task(publish_local_events(host, broker, file_manager))
 
     # Set up a subprocess listener
-    # subprocess_queue = asyncio.Queue()
-    # subprocess = asyncio.create_task(
-    #     run_subprocess(subprocess_queue, "cat", ["/dev/random"])
-    # )
-    # local_events = asyncio.create_task(
-    #     local_event_handler(host, subprocess_queue, file_manager, 100)
-    # )
+    subprocess_queue = asyncio.Queue()
+    subprocess = asyncio.create_task(
+        run_subprocess(subprocess_queue, "yes", ["0123456789ABCDEF"])
+    )
+    local_events = asyncio.create_task(
+        local_event_handler(host, subprocess_queue, file_manager, 100)
+    )
 
     await asyncio.gather(
         subscriber,
