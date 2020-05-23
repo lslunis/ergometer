@@ -46,6 +46,16 @@ class HostPosition(Base):
     def __str__(self):
         return f"{self.host}:{self.position}"
 
+    @staticmethod
+    def update(session, host, data, position):
+        host_position = session.query(HostPosition).get(host)
+        if not host_position:
+            host_position = HostPosition(host=host, position=0)
+            session.add(host_position)
+        if position != host_position.position:
+            raise PositionError(f"expected {host_position}, got {position}")
+        host_position.position += len(data)
+
 
 class Setting(Base):
     __tablename__ = "settings"
@@ -228,16 +238,8 @@ def initialize_cache(cache, now, session):
     return host_positions
 
 
-# TODO: split the host position part of update_cache into another function
-# TODO: rename the test
 def update_cache(cache, now, session, host, data, position):
-    host_position = session.query(HostPosition).get(host)
-    if not host_position:
-        host_position = HostPosition(host=host, position=0)
-        session.add(host_position)
-    if position != host_position.position:
-        raise PositionError(f"expected {host_position}, got {position}")
-    host_position.position += len(data)
+    HostPosition.update(session, host, data, position)
 
     today_start = day_start_of(now)
     day_start = cache["day_start"]
@@ -265,7 +267,6 @@ def update_cache(cache, now, session, host, data, position):
         for setting in session.dirty
         if isinstance(setting, Setting)
     }
-
     if daily_total is None:
         daily_total = Pause.daily_activity_total(session, today_start)
     delta.update(day_start=day_start, daily_total=daily_total)
