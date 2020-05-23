@@ -1,4 +1,4 @@
-from .state import *
+from .cache_updater import *
 
 
 def add_pauses(session, *times):
@@ -92,6 +92,7 @@ def test_time_falls_between_pauses():
 
         pause_updater.update(29, 1)
         assert_pauses(session, (0, 25), (30, 59), (65, max_time))
+        assert not pause_updater.updated
 
 
 class SessionProxy:

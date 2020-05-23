@@ -1,6 +1,7 @@
+from contextlib import contextmanager
+from datetime import timedelta
 from enum import Enum
 from itertools import chain, islice, repeat
-from contextlib import contextmanager
 import struct
 
 from sqlalchemy import Column, Integer, String, create_engine, event
@@ -46,34 +47,28 @@ class HostPosition(Base):
         return f"{self.host}:{self.position}"
 
 
-# TODO: rename to Setting
-class Target(Base):
-    __tablename__ = "targets"
+class Setting(Base):
+    __tablename__ = "settings"
     id = Column(Integer, primary_key=True)
-    target = Column(Integer, nullable=False)
+    value = Column(Integer, nullable=False)
     time = Column(Integer, nullable=False)
 
     @staticmethod
-    def get(session, kind):
-        id = kind.value
-        target = session.query(Target).get(id)
-        if target is None:
-            defaults = {Kind.daily_target: 8 * 3600,
-                        Kind.session_target: 3600,
-                        Kind.rest_target: 5 * 60}
-            # TODO: get rid of magic numbers
-            target = Target(id=id, target=defaults[kind], time=0)
-            session.add(target)
-        return target
+    def get(session, event_type):
+        id = event_type.value
+        setting = session.query(Setting).get(id)
+        if setting is None:
+            setting = Setting(id=id, value=event_type.default_value, time=0)
+            session.add(setting)
+        return setting
 
-    @staticmethod
-    def as_state(*targets):
-        return {Kind(t.id).name: t.target for t in targets}
+    @property
+    def name(self):
+        return EventType(self.id).name
 
-    def update_if_newer(self, target, time):
+    def update_if_newer(self, value, time):
         if self.time < time:
-            self.target = target
-            return True
+            self.value = value
 
 
 class Pause(Base):
@@ -92,8 +87,8 @@ class Pause(Base):
         return f"<Pause {self.start} {self.end}>"
 
     @staticmethod
-    def as_state(session):
-        rest_target = Target.get(session, Kind.rest_target).target
+    def session_interval_cache(session):
+        rest_target = Setting.get(session, EventType.rest_target).value
         print(repr(rest_target))
         rests = (
             session.query(Pause)
@@ -103,15 +98,16 @@ class Pause(Base):
         last_rest, prior_rest = islice(chain(rests.limit(2), repeat(None)), 2)
         return dict(
             session_start=prior_rest.end if prior_rest else 0,
-            rest_start=last_rest.start if last_rest else 0,
+            session_end=last_rest.start if last_rest else 0,
         )
 
     @staticmethod
-    def daily_activity_total(session, day):
+    def daily_activity_total(session, day_start):
+        day_end = day_start + timedelta(days=1).total_seconds()
         pauses = (
             session.query(Pause)
-            .filter(Pause.start < day + 86400)  # drop pauses that are in the future
-            .filter(Pause.end > day)  # drops pauses that are in the past
+            .filter(Pause.start < day_end)  # drop pauses that are in the future
+            .filter(Pause.end > day_start)  # drops pauses that are in the past
             .orderby(Pause.end)
         )
         total = 0
@@ -132,6 +128,7 @@ class PauseUpdater:
         self.session = session
         self.start = None
         self.pause = None
+        self.updated = False
 
     def seek(self, time):
         if self.pause and self.start <= time < self.pause.end:
@@ -160,8 +157,11 @@ class PauseUpdater:
         right_span = span - left_span - value
         left_span = clip_span(left_span)
         right_span = clip_span(right_span)
-        total = span - left_span - right_span
-        die_unless(0 < total < 2 * min_span, f"unexpected total: {total}")
+        activity_increase = span - left_span - right_span
+        die_unless(
+            0 < activity_increase < 2 * min_span,
+            f"unexpected activity_increase: {activity_increase}",
+        )
 
         if right_span:
             self.pause.start = self.pause.end - right_span
@@ -174,48 +174,50 @@ class PauseUpdater:
             self.session.add(Pause(start=(time - left_span), end=time))
             self.start = time
 
-        return total
+        self.updated = True
+        return activity_increase
 
 
-# TODO: rename kind to make it more specific
+class EventType(Enum):
+    action = 0
+    daily_target = (1, timedelta(hours=8))
+    session_target = (2, timedelta(hours=1))
+    rest_target = (3, timedelta(minutes=5))
 
+    def __new__(cls, value, default=None):
+        self = object.__new__(cls)
+        self._value_ = value
+        if default:
+            self.default_value = default.total_seconds()
+        return self
 
-class Kind(Enum):
-    daily_target = 1
-    session_target = 2
-    rest_target = 3
-    action = 4
-
-
-# TODO: rename state to reflect its functionality as cache
 
 data_format = "<BxxxIQ"
 
 
 @retry_on(PositionError)
-async def state_updater(state, broker):
-    Session = connect("sqlite:///state.db")
-    host_positions = initialize_state(state, imprecise_clock(), Session())
+async def cache_updater(cache, broker):
+    Session = connect("sqlite:///cache.db")
+    host_positions = initialize_cache(cache, imprecise_clock(), Session())
     async for args in broker.subscribe(host_positions):
-        update_state(state, imprecise_clock(), Session(), *args)
+        update_cache(cache, imprecise_clock(), Session(), *args)
 
 
-def initialize_state(state, now, session):
-    today = day_start_of(now)
+def initialize_cache(cache, now, session):
+    today_start = day_start_of(now)
     delta = {
-        **Target.as_state(*session.query(Target)),
-        "day": today,
-        "daily_total": Pause.daily_activity_total(session, today),
-        **Pause.as_state(session),
+        **{s.name: s.value for s in session.query(Setting)},
+        "day_start": today_start,
+        "daily_total": Pause.daily_activity_total(session, today_start),
+        **Pause.session_interval_cache(session),
     }
     host_positions = {hp.host: hp.position for hp in session.query(HostPosition)}
     session.commit()
-    state.update(delta)
+    cache.update(delta)
     return host_positions
 
 
-# TODO: rename all instances of "day" to "day_start"
-def update_state(state, now, session, host, data, position):
+def update_cache(cache, now, session, host, data, position):
     host_position = session.query(HostPosition).get(host)
     if not host_position:
         host_position = HostPosition(host=host, position=0)
@@ -224,39 +226,40 @@ def update_state(state, now, session, host, data, position):
         raise PositionError(f"expected {host_position}, got {position}")
     host_position.position += len(data)
 
-    updated_targets = set()
-    today = day_start_of(now)
-    day = state["day"]
-    daily_total = state["daily_total"]
-    if day != today:
-        day = today
+    today_start = day_start_of(now)
+    day_start = cache["day_start"]
+    daily_total = cache["daily_total"]
+    if day_start != today_start:
+        day_start = today_start
         daily_total = None
-    pauses_changed = False
     pause_updater = PauseUpdater(session)
 
-    for kind_value, value, time in struct.iter_unpack(data_format, data):
-        kind = Kind(kind_value)
-        if kind == Kind.action:
-            increment = pause_updater.update(time, value)
-            if increment:
-                pauses_changed = True
-            if daily_total is not None and is_on_day(time, day):
-                # this could attribute the increment to the wrong day if
-                # activity occurs at day boundary, but it can only be wrong
+    for event_type_id, value, time in struct.iter_unpack(data_format, data):
+        event_type = EventType(event_type_id)
+        if event_type == EventType.action:
+            activity_increase = pause_updater.update(time, value)
+            if daily_total is not None and is_on_day(time, day_start):
+                # this could attribute the activity_increase to the wrong day_start if
+                # activity occurs at day_start boundary, but it can only be wrong
                 # by less than min_idle seconds
-                daily_total += increment
+                daily_total += activity_increase
         else:
-            target = Target.get(session, kind)
-            if target.update_if_newer(value, time):
-                updated_targets.add(target)
-    delta = Target.as_state(*updated_targets)
+            setting = Setting.get(session, event_type)
+            setting.update_if_newer(value, time)
+
+    delta = {
+        setting.name: setting.value
+        for setting in session.dirty
+        if isinstance(setting, Setting)
+    }
+
     if daily_total is None:
-        daily_total = Pause.daily_activity_total(session, today)
-    delta.update(day=day, daily_total=daily_total)
-    if pauses_changed:
-        delta.update(Pause.as_state(session))
+        daily_total = Pause.daily_activity_total(session, today_start)
+    delta.update(day_start=day_start, daily_total=daily_total)
+    if pause_updater.updated:
+        delta.update(Pause.session_interval_cache(session))
     session.commit()
-    state.update(delta)
+    cache.update(delta)
 
 
 def metrics_at(
@@ -264,7 +267,7 @@ def metrics_at(
     daily_target,
     session_target,
     rest_target,
-    day,
+    day_start,
     daily_total,
     session_start,
     rest_start,
@@ -274,7 +277,7 @@ def metrics_at(
         daily_target=daily_target,
         session_target=session_target,
         rest_target=rest_target,
-        daily_value=daily_total if is_on_day(now, day) else 0,
+        daily_value=daily_total if is_on_day(now, day_start) else 0,
         session_value=now - session_start if rest_value < rest_target else 0,
         rest_value=rest_value,
     )
