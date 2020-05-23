@@ -65,7 +65,9 @@ class Setting(Base):
         if event_type == EventType.rest_target:
             if exists:
                 session.execute("DROP INDEX rests")
-            session.execute(f"CREATE INDEX rests ON pauses(end) WHERE end - start >= {setting.value}")
+            session.execute(
+                f"CREATE INDEX rests ON pauses(end) WHERE end - start >= {setting.value}"
+            )
         return setting
 
     @property
