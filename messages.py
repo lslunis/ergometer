@@ -22,7 +22,9 @@ class Message(metaclass=Registrar):
         self.fields = {}
         for k, v in fields.items():
             if k not in self.FIELDS:
-                raise Exception(f"Invalid field for {self.TYPE}: {k}")
+                raise Exception(
+                    f"Invalid field for {self.TYPE}: {k}. Allowed values are: {self.FIELDS}"
+                )
             self.fields[k] = v
             setattr(self, k, v)
         missing = set(fields.keys()) - set(self.FIELDS)
@@ -69,6 +71,11 @@ class WriteResponse(Message):
 class ReadRequest(Message):
     FIELDS = ["positions", "exclude"]
     TYPE = "read_req"
+
+
+class ReadResponse(Message):
+    FIELDS = ["host", "data", "pos"]
+    TYPE = "read_resp"
 
 
 class HostPositionRequest(Message):
