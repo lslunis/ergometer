@@ -16,7 +16,7 @@ async def main():
     broker = BrokerClient(cloud_broker_address)
     subscriber = asyncio.create_task(change_subscriber(host, broker, file_manager))
 
-    # Set up the local change publisher.
+    # # Set up the local change publisher.
     publisher = asyncio.create_task(publish_local_events(host, broker, file_manager))
 
     # Set up a subprocess listener
@@ -29,10 +29,7 @@ async def main():
     )
 
     await asyncio.gather(
-        subscriber,
-        publisher,
-        # subprocess,
-        # local_events,
+        subscriber, publisher, subprocess, local_events,
     )
 
 
