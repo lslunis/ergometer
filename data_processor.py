@@ -7,7 +7,7 @@ import os
 import os.path as path
 import sys
 import uuid
-from util import FatalError, die_unless, retry_on
+from util import FatalError, die_unless, retry_on, retry_on_iter
 import messages as m
 
 # trim at startup
@@ -196,6 +196,7 @@ class BrokerClient:
         self.address = address
         self.queue = asyncio.Queue(maxsize=1000)
 
+    @retry_on_iter(OSError, retry_delay=5)
     async def read(self, positions, exclude=None):
         async with websockets.connect(self.address) as websocket:
             msg = m.ReadRequest(None, positions=positions, exclude=exclude)
@@ -205,6 +206,7 @@ class BrokerClient:
                 resp = m.Message.decode(msg)
                 yield (resp.host, resp.data, resp.pos)
 
+    @retry_on(OSError, return_on_success=True, retry_delay=5)
     async def write(self, host, data, position):
         async with websockets.connect(self.address) as websocket:
             msg = m.WriteRequest(None, data=data, pos=position, host=host)
@@ -212,6 +214,7 @@ class BrokerClient:
             resp = m.Message.decode(await websocket.recv())
             return resp.pos
 
+    @retry_on(OSError, return_on_success=True, retry_delay=5)
     async def host_position(self, host):
         async with websockets.connect(self.address) as websocket:
             await websocket.send(m.HostPositionRequest(None, host=host).encode())
