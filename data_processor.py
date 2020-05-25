@@ -1,5 +1,3 @@
-import base64
-import json
 import websockets
 import platform
 import asyncio
@@ -10,6 +8,7 @@ import os.path as path
 import sys
 import uuid
 from util import FatalError, die_unless, retry_on
+import messages as m
 
 # trim at startup
 # mark irrecoverable data
@@ -199,39 +198,25 @@ class BrokerClient:
 
     async def read(self, positions, exclude=None):
         async with websockets.connect(self.address) as websocket:
-            msg = {"action": "read", "positions": positions}
-            if exclude is not None:
-                msg["exclude"] = exclude
-            await websocket.send(json.dumps(msg))
+            msg = m.ReadRequest(None, positions=positions, exclude=exclude)
+            await websocket.send(msg.encode())
             while True:
                 msg = await websocket.recv()
-                resp = json.loads(msg)
-                yield (
-                    resp["host"],
-                    base64.b64decode(resp["data"]),
-                    resp["pos"],
-                )
+                resp = m.Message.decode(msg)
+                yield (resp.host, resp.data, resp.pos)
 
     async def write(self, host, data, position):
         async with websockets.connect(self.address) as websocket:
-            await websocket.send(
-                json.dumps(
-                    {
-                        "action": "write",
-                        "data": base64.b64encode(data).decode("ascii"),
-                        "pos": position,
-                        "host": host,
-                    }
-                )
-            )
-            resp = json.loads(await websocket.recv())
-            return resp["pos"]
+            msg = m.WriteRequest(None, data=data, pos=position, host=host)
+            await websocket.send(msg.encode())
+            resp = m.Message.decode(await websocket.recv())
+            return resp.pos
 
     async def host_position(self, host):
         async with websockets.connect(self.address) as websocket:
-            await websocket.send(json.dumps({"action": "host_position", "host": host}))
-            resp = json.loads(await websocket.recv())
-            return resp["pos"]
+            await websocket.send(m.HostPositionRequest(None, host=host).encode())
+            resp = m.Message.decode(await websocket.recv())
+            return resp.pos
 
 
 def get_current_host(storage_root):

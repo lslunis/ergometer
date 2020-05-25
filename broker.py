@@ -1,9 +1,8 @@
-import json
-import base64
 import asyncio
 from data_processor import *
 from util import die_unless, FatalError
 import websockets
+import messages as m
 
 BATCH_SIZE = 100
 
@@ -41,6 +40,7 @@ async def send_updates(file_manager, websocket, client_positions, exclude=None):
             do_break = False
             for task in done:
                 value = await task
+
                 # The completed task is waiting on a new file. When we've
                 # sent all of the data from this iteratio we should
                 # get a new set of positions.
@@ -58,14 +58,8 @@ async def send_updates(file_manager, websocket, client_positions, exclude=None):
                     )
                 )
                 client_positions[host_completed] = pos + len(data)
-                msg = json.dumps(
-                    {
-                        "host": host_completed,
-                        "pos": pos,
-                        "data": base64.b64encode(data).decode("ascii"),
-                    }
-                )
-                await websocket.send(msg)
+                msg = m.ReadResponse(None, host=host_completed, pos=pos, data=data)
+                await websocket.send(msg.encode())
 
             # If there's a new file reset everything. Otherwise keep
             # awaitng the next task.
@@ -77,30 +71,24 @@ def client_handler(file_manager):
     async def handle_client(websocket, path):
         try:
             async for message in websocket:
-                msg = json.loads(message)
-                if msg["action"] == "read":
+                msg = m.Message.decode(message)
+                if msg.type == m.ReadRequest.TYPE:
                     asyncio.create_task(
                         send_updates(
-                            file_manager,
-                            websocket,
-                            msg["positions"],
-                            msg.get("exclude", None),
+                            file_manager, websocket, msg.positions, msg.exclude
                         )
                     )
-                elif msg["action"] == "write":
-                    raw_data = base64.b64decode(msg["data"])
-                    file_manager.write(
-                        msg["host"], [raw_data], position=msg["pos"],
-                    )
-                    resp = json.dumps({"pos": msg["pos"] + len(raw_data)})
-                    await websocket.send(resp)
+                elif msg.type == m.WriteRequest.TYPE:
+                    file_manager.write(msg.host, [msg.data], position=msg.pos)
+                    resp = m.WriteResponse(None, pos=msg.pos + len(msg.data))
+                    await websocket.send(resp.encode())
 
-                elif msg["action"] == "host_position":
-                    pos = file_manager.positions.get(msg["host"], 0)
-                    resp = json.dumps({"pos": pos})
-                    await websocket.send(resp)
+                elif msg.type == m.HostPositionRequest.TYPE:
+                    pos = file_manager.positions.get(msg.host, 0)
+                    resp = m.HostPositionResponse(None, pos=pos)
+                    await websocket.send(resp.encode())
                 else:
-                    raise FatalError("Unknown action type in message: {msg}")
+                    raise FatalError("Unknown action type in message: {message}")
         except websockets.exceptions.ConnectionClosedError:
             pass
 
