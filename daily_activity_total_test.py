@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 
 from .cache_updater import connect, Pause
-from .pause_test_util import add_pauses
+from .activity_test_util import add_activity
 
 
 def iso(s):
@@ -31,6 +31,6 @@ def test_empty():
 def test_pauses_overlap_day_boundaries():
     with connect("sqlite://") as Session:
         session = Session()
-        add_pauses(session, iso("2020-05-23 05"), iso("2020-05-24 03"))
+        add_activity(session, iso("2020-05-23 05"), iso("2020-05-24 03"))
         total = Pause.daily_activity_total(session, iso("2020-05-23 04"))
         assert total == timedelta(hours=22).total_seconds()
