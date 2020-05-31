@@ -25,4 +25,5 @@ def precise_clock():
 
 
 # SQLite uses variable length integers, so limit the size that timestamps will take up
-max_time = 2 ** 48 - 1
+# https://sqlite.org/src4/doc/trunk/www/varint.wiki
+max_time = 2 ** 40 - 1
