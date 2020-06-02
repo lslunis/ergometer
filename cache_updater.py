@@ -109,23 +109,13 @@ class ActivityEdge(Base):
     @staticmethod
     def session_interval_cache(session):
         rest_target = Setting.get(session, EventType.rest_target).value
-        rests = (
-            session.query(ActivityEdge)
-            .order_by(ActivityEdge.end.desc())
-            .filter((ActivityEdge.end - ActivityEdge.start) >= rest_target)
+        edges = iter(session.query(ActivityEdge).order_by(ActivityEdge.end.desc()))
+        pauses = (Interval(start, end) for end, start in zip(edges, edges))
+        rests = (p for p in pauses if (p.end - p.start) >= rest_target)
+        last_rest, prior_rest = islice(
+            chain(islice(rests, 2), repeat(Interval(0, 0))), 2
         )
-        last_rest, prior_rest = islice(chain(rests.limit(2), repeat(None)), 2)
-        return dict(
-            session_start=prior_rest.end if prior_rest else 0,
-            session_end=last_rest.start if last_rest else 0,
-        )
-
-    @staticmethod
-    def as_rests(session):
-        edges = session.query(ActivityEdge).order_by(ActivityEdge.end.desc())
-        pauses = zip(edges, edges)
-        #.filter((ActivityEdge.end - ActivityEdge.start) >= rest_target)
-
+        return dict(session_start=prior_rest.end, session_end=last_rest.start)
 
     @staticmethod
     def daily_activity_total(session, day_start):
@@ -221,7 +211,7 @@ class EventType(Enum):
         return self
 
 
-Interval = namedtuple('Interval', ['start', 'end'])
+Interval = namedtuple("Interval", ["start", "end"])
 
 data_format = "<BxxxIQ"
 
