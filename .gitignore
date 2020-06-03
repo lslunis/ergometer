@@ -1,4 +1,5 @@
-*.exe
-*.obj
 __pycache__
 *.db
+*.exe
+*.obj
+venv/
