@@ -1,3 +1,4 @@
+from collections import namedtuple
 from contextlib import contextmanager
 from datetime import timedelta
 from enum import Enum
@@ -72,13 +73,6 @@ class Setting(Base):
         if not exists:
             setting = Setting(id=id, value=event_type.default_value, time=0)
             session.add(setting)
-        if event_type == EventType.rest_target:
-            if exists:
-                session.execute("DROP INDEX rests")
-            rest_target = setting.value
-            session.execute(
-                f"CREATE INDEX rests ON pauses(end) WHERE end - start >= {rest_target}"
-            )
         return setting
 
     @property
@@ -109,8 +103,8 @@ class ActivityEdge(Base):
     @staticmethod
     def session_interval_cache(session):
         rest_target = Setting.get(session, EventType.rest_target).value
-        edges = iter(session.query(ActivityEdge).order_by(ActivityEdge.end.desc()))
-        pauses = (Interval(start, end) for end, start in zip(edges, edges))
+        edges = iter(session.query(ActivityEdge).order_by(ActivityEdge.time.desc()))
+        pauses = (Interval(start.time, end.time) for end, start in zip(edges, edges))
         rests = (p for p in pauses if (p.end - p.start) >= rest_target)
         last_rest, prior_rest = islice(
             chain(islice(rests, 2), repeat(Interval(0, 0))), 2
@@ -135,11 +129,11 @@ class ActivityEdge(Base):
         return total
 
 
-min_span = 15
+min_pause = 15
 
 
 def clip_span(span):
-    return 0 if span < min_span else span
+    return 0 if span < min_pause else span
 
 
 class PauseUpdater:
@@ -178,7 +172,7 @@ class PauseUpdater:
         right_span = clip_span(right_span)
         activity_increase = span - left_span - right_span
         die_unless(
-            0 < activity_increase < 2 * min_span,
+            0 < activity_increase < 2 * min_pause,
             f"unexpected activity_increase: {activity_increase}",
         )
 
