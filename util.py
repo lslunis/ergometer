@@ -1,6 +1,25 @@
 import asyncio
 from warnings import warn
 from functools import wraps
+from itertools import takewhile
+
+
+class FatalError(Exception):
+    ...
+
+
+class PositionError(Exception):
+    ...
+
+
+def die_unless(cond, message):
+    if not cond:
+        raise Exception(message)
+
+
+def pairwise(iterable):
+    iterator = iter(iterable)
+    return zip(iterator, iterator)
 
 
 def retry_on(Error, return_on_success=False, retry_delay=None):
@@ -44,14 +63,8 @@ def retry_on_iter(Error, retry_delay=None):
     return curry
 
 
-class PositionError(Exception):
-    pass
-
-
-def die_unless(cond, message):
-    if not cond:
-        raise Exception(message)
-
-
-class FatalError(Exception):
-    pass
+def takeuntil_inclusive(predicate, iterable):
+    for x in iterable:
+        yield x
+        if predicate(x):
+            return
