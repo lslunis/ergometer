@@ -1,16 +1,16 @@
+import struct
 from collections import namedtuple
 from contextlib import contextmanager
 from datetime import timedelta
 from enum import Enum
-from itertools import chain, islice, repeat
-import struct
+from itertools import chain, dropwhile, islice, repeat
 
 from sqlalchemy import Boolean, Column, Integer, String, create_engine, event
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-from .time import day_start_of, is_on_day, imprecise_clock, max_time
-from .util import retry_on, PositionError, die_unless
+from .time import day_start_of, imprecise_clock, is_on_day, max_time
+from .util import PositionError, die_unless, pairwise, retry_on, takeuntil_inclusive
 
 
 @contextmanager
@@ -103,8 +103,8 @@ class ActivityEdge(Base):
     @staticmethod
     def session_interval_cache(session):
         rest_target = Setting.get(session, EventType.rest_target).value
-        edges = iter(session.query(ActivityEdge).order_by(ActivityEdge.time.desc()))
-        pauses = (Interval(start.time, end.time) for end, start in zip(edges, edges))
+        edges = session.query(ActivityEdge).order_by(ActivityEdge.time.desc())
+        pauses = (Interval(start.time, end.time) for end, start in pairwise(edges))
         rests = (p for p in pauses if (p.end - p.start) >= rest_target)
         last_rest, prior_rest = islice(
             chain(islice(rests, 2), repeat(Interval(0, 0))), 2
@@ -112,21 +112,32 @@ class ActivityEdge(Base):
         return dict(session_start=prior_rest.end, session_end=last_rest.start)
 
     @staticmethod
-    def daily_activity_total(session, day_start):
-        day_end = day_start + timedelta(days=1).total_seconds()
-        pauses = (
+    def activity_total(session, start, end):
+        lower_bound_edge = (
             session.query(ActivityEdge)
-            .filter(ActivityEdge.start < day_end)  # drop pauses that are in the future
-            .filter(ActivityEdge.end > day_start)  # drops pauses that are in the past
-            .order_by(ActivityEdge.end)
+            .filter(ActivityEdge.time < start)
+            .order_by(ActivityEdge.time.desc())
+            .limit(1)
+            .one_or_none()
         )
-        total = 0
-        prior_pause = None
-        for pause in pauses:
-            if prior_pause:
-                total += pause.start - prior_pause.end
-            prior_pause = pause
-        return total
+        if lower_bound_edge is None:
+            lower_bound_edge = ActivityEdge(time=0, rising=False)
+
+        edges = (
+            session.query(ActivityEdge)
+            .filter(ActivityEdge.time >= lower_bound_edge.time)
+            .order_by(ActivityEdge.time)
+        )
+        edges = dropwhile(lambda edge: not edge.rising, edges)
+        edges = takeuntil_inclusive(lambda edge: edge.time > end, edges)
+
+        # pairwise() will drop the rising edge at max_time
+        activities = (
+            Interval(max(activity_start.time, start), min(activity_end.time, end))
+            for activity_start, activity_end in pairwise(edges)
+        )
+
+        return sum(activity.end - activity.start for activity in activities)
 
 
 min_pause = 15
@@ -220,10 +231,11 @@ async def cache_updater(cache, broker):
 
 def initialize_cache(cache, now, session):
     today_start = day_start_of(now)
+    today_end = today_start + timedelta(days=1).total_seconds()
     delta = {
         **{s.name: s.value for s in session.query(Setting)},
         "day_start": today_start,
-        "daily_total": ActivityEdge.daily_activity_total(session, today_start),
+        "daily_total": ActivityEdge.activity_total(session, today_start, today_end),
         **ActivityEdge.session_interval_cache(session),
     }
     host_positions = {hp.host: hp.position for hp in session.query(HostPosition)}
@@ -262,7 +274,8 @@ def update_cache(cache, now, session, host, data, position):
         if isinstance(setting, Setting)
     }
     if daily_total is None:
-        daily_total = ActivityEdge.daily_activity_total(session, today_start)
+        today_end = today_start + timedelta(days=1).total_seconds()
+        daily_total = ActivityEdge.activity_total(session, today_start, today_end)
     delta.update(day_start=day_start, daily_total=daily_total)
     if pause_updater.updated:
         delta.update(ActivityEdge.session_interval_cache(session))
