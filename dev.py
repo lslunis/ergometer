@@ -10,7 +10,7 @@ def mtime(path):
     return os.stat(path).st_mtime_ns
 
 
-def build():
+def build(*args):
     if mtime("activity_monitor.exe") < mtime("activity_monitor.cpp"):
         run("build_activity_monitor.bat")
 
@@ -20,15 +20,15 @@ def build():
     run("venv/Scripts/pip install -q -r requirements.txt")
 
 
-def freeze():
+def freeze(*args):
     run(r"venv\Scripts\pip freeze > requirements.txt", shell=True)
 
 
-def test():
-    run("venv/Scripts/pytest")
+def test(*args):
+    run(["venv/Scripts/pytest", *args])
 
 
-def upgrade():
+def upgrade(*args):
     lines = (
         run("venv/Scripts/pip list --format freeze --outdated", capture_output=True)
         .stdout.decode("ascii")
@@ -42,4 +42,5 @@ def upgrade():
 
 
 if __name__ == "__main__" and len(sys.argv) > 1:
-    dict(b=build, f=freeze, t=test, u=upgrade).get(sys.argv[1][0], lambda: ...)()
+    cmd, *args = sys.argv[1:]
+    dict(b=build, f=freeze, t=test, u=upgrade).get(cmd[0], lambda *args: ...)(*args)
