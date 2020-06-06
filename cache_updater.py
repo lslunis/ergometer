@@ -12,10 +12,12 @@ from sqlalchemy.orm import sessionmaker
 from .time import day_start_of, imprecise_clock, is_on_day, max_time
 from .util import PositionError, die_unless, pairwise, retry_on, takeuntil_inclusive
 
+Session = sessionmaker()
+
 
 @contextmanager
 def connect(db_address):
-    engine = create_engine(db_address)
+    engine = create_engine(db_address, echo=True)
 
     try:
         # Override pysqlite's broken transaction handling
@@ -29,8 +31,8 @@ def connect(db_address):
             connection.execute("BEGIN")
 
         Base.metadata.create_all(engine)
-
-        yield sessionmaker(bind=engine)
+        Session.configure(bind=engine)
+        yield Session
 
     finally:
         engine.dispose()
@@ -118,10 +120,8 @@ class ActivityEdge(Base):
             .filter(ActivityEdge.time < start)
             .order_by(ActivityEdge.time.desc())
             .limit(1)
-            .one_or_none()
+            .one()
         )
-        if lower_bound_edge is None:
-            lower_bound_edge = ActivityEdge(time=0, rising=False)
 
         edges = (
             session.query(ActivityEdge)
@@ -131,13 +131,20 @@ class ActivityEdge(Base):
         edges = dropwhile(lambda edge: not edge.rising, edges)
         edges = takeuntil_inclusive(lambda edge: edge.time > end, edges)
 
-        # pairwise() will drop the rising edge at max_time
         activities = (
             Interval(max(activity_start.time, start), min(activity_end.time, end))
             for activity_start, activity_end in pairwise(edges)
         )
 
         return sum(activity.end - activity.start for activity in activities)
+
+
+@event.listens_for(ActivityEdge.__table__, "after_create")
+def do_after_create(target, connection, **kwds):
+    session = Session(bind=connection)
+    session.add(ActivityEdge(time=0, rising=False))
+    session.add(ActivityEdge(time=max_time, rising=True))
+    session.commit()
 
 
 min_pause = 15

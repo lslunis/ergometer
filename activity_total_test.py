@@ -8,6 +8,15 @@ def iso(s):
     return datetime.fromisoformat(s).timestamp()
 
 
+def test_empty():
+    with connect("sqlite://") as Session:
+        session = Session()
+        total = ActivityEdge.activity_total(
+            session, iso("2020-05-23 04"), iso("2020-05-24 04")
+        )
+        assert total == 0
+
+
 def test_one_pause_in_a_day():
     with connect("sqlite://") as Session:
         session = Session()
@@ -22,15 +31,6 @@ def test_one_pause_in_a_day():
             session, iso("2020-05-23 04"), iso("2020-05-24 04")
         )
         assert total == timedelta(hours=2).total_seconds()
-
-
-def test_empty():
-    with connect("sqlite://") as Session:
-        session = Session()
-        total = ActivityEdge.activity_total(
-            session, iso("2020-05-23 04"), iso("2020-05-24 04")
-        )
-        assert total == 0
 
 
 def test_pauses_overlap_day_boundaries():

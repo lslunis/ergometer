@@ -17,5 +17,7 @@ def activity_from_times(times):
     for i in range(0, len(times), 2):
         pause_start, pause_end = times[i : i + 2]
         assert pause_end - pause_start >= min_pause
-        yield ActivityEdge(time=pause_start, rising=False)
-        yield ActivityEdge(time=pause_end, rising=True)
+        if pause_start != 0:
+            yield ActivityEdge(time=pause_start, rising=False)
+        if pause_end != max_time:
+            yield ActivityEdge(time=pause_end, rising=True)
