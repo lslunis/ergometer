@@ -5,7 +5,7 @@ from datetime import timedelta
 from enum import Enum
 from itertools import chain, dropwhile, islice, repeat
 
-from sqlalchemy import Boolean, Column, Integer, String, create_engine, event
+from sqlalchemy import Boolean, Column, Integer, String, create_engine, event, func
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
@@ -115,17 +115,14 @@ class ActivityEdge(Base):
 
     @staticmethod
     def activity_total(session, start, end):
-        lower_bound_edge = (
-            session.query(ActivityEdge)
+        lower_bound = (
+            session.query(func.max(ActivityEdge.time))
             .filter(ActivityEdge.time < start)
-            .order_by(ActivityEdge.time.desc())
-            .limit(1)
-            .one()
         )
 
         edges = (
             session.query(ActivityEdge)
-            .filter(ActivityEdge.time >= lower_bound_edge.time)
+            .filter(ActivityEdge.time >= lower_bound)
             .order_by(ActivityEdge.time)
         )
         edges = dropwhile(lambda edge: not edge.rising, edges)
