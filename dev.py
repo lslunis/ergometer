@@ -35,7 +35,10 @@ def test(*args):
 
 def upgrade(*args):
     lines = (
-        run(f"{bin_dir}/pip list --format freeze --outdated".split(), capture_output=True)
+        run(
+            f"{bin_dir}/pip list --format freeze --outdated".split(),
+            capture_output=True,
+        )
         .stdout.decode("ascii")
         .splitlines()
     )

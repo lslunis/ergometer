@@ -115,18 +115,8 @@ class ActivityEdge(Base):
 
     @staticmethod
     def activity_total(session, start, end):
-        lower_bound = (
-            session.query(func.max(ActivityEdge.time))
-            .filter(ActivityEdge.time < start)
-        )
-
-        edges = (
-            session.query(ActivityEdge)
-            .filter(ActivityEdge.time >= lower_bound)
-            .order_by(ActivityEdge.time)
-        )
+        edges = ActivityEdge.get_edges_including_bounds(session, start, end)
         edges = dropwhile(lambda edge: not edge.rising, edges)
-        edges = takeuntil_inclusive(lambda edge: edge.time > end, edges)
 
         activities = (
             Interval(max(activity_start.time, start), min(activity_end.time, end))
@@ -134,6 +124,19 @@ class ActivityEdge(Base):
         )
 
         return sum(activity.end - activity.start for activity in activities)
+
+    @staticmethod
+    def get_edges_including_bounds(session, start, end):
+        lower_bound = session.query(func.max(ActivityEdge.time)).filter(
+            ActivityEdge.time < start
+        )
+        edges = (
+            session.query(ActivityEdge)
+            .filter(ActivityEdge.time >= lower_bound)
+            .order_by(ActivityEdge.time)
+        )
+
+        return takeuntil_inclusive(lambda edge: edge.time > end, edges)
 
 
 @event.listens_for(ActivityEdge.__table__, "after_create")
@@ -151,7 +154,7 @@ def clip_span(span):
     return 0 if span < min_pause else span
 
 
-class PauseUpdater:
+class ActivityUpdater:
     def __init__(self, session):
         self.session = session
         self.start = None
@@ -257,7 +260,7 @@ def update_cache(cache, now, session, host, data, position):
     if day_start != today_start:
         day_start = today_start
         daily_total = None
-    pause_updater = PauseUpdater(session)
+    pause_updater = ActivityUpdater(session)
 
     for event_type_id, value, time in struct.iter_unpack(data_format, data):
         event_type = EventType(event_type_id)
