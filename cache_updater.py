@@ -17,7 +17,7 @@ Session = sessionmaker()
 
 @contextmanager
 def connect(db_address):
-    engine = create_engine(db_address, echo=True)
+    engine = create_engine(db_address)
 
     try:
         # Override pysqlite's broken transaction handling
