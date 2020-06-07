@@ -79,13 +79,13 @@ def test_time_falls_between_pauses():
 
         activity_updater.update(29, 1)
         assert_activity(session, 25, 30, 59, 65)
-        assert not activity_updater.updated
 
 
-class SessionProxy:
+class QueryCounter:
     def __init__(self, session):
         self.session = session
         self.query_count = 0
+        self.expected_query_count = 0
 
     def __getattr__(self, name):
         if name == "query":
@@ -94,28 +94,39 @@ class SessionProxy:
             raise AttributeError
         return getattr(self.session, name)
 
+    def expect_queries(self):
+        self.expected_query_count += 2
+        self.check_count()
+
+    def expect_no_queries(self):
+        self.check_count()
+
+    def check_count(self):
+        assert self.query_count == self.expected_query_count
+
 
 def test_query_frequency():
     with connect("sqlite://") as Session:
         session = Session()
-        proxy = SessionProxy(session)
-        activity_updater = ActivityUpdater(proxy)
+        query_counter = QueryCounter(session)
+        activity_updater = ActivityUpdater(query_counter)
         add_activity(session, 25, 30, 70, 75)
 
         activity_updater.update(27, 1)
-        assert proxy.query_count == 1
+        query_counter.expect_queries()
 
         activity_updater.update(29, 1)
-        assert proxy.query_count == 1
+        query_counter.expect_queries()
 
         activity_updater.update(45, 1)
-        assert proxy.query_count == 1
+        query_counter.expect_no_queries()
 
         activity_updater.update(40, 1)
-        assert proxy.query_count == 2
+        query_counter.expect_no_queries()
 
         activity_updater.update(50, 1)
-        assert proxy.query_count == 3
+        query_counter.expect_queries()
 
         activity_updater.update(60, 1)
-        assert proxy.query_count == 3
+        query_counter.expect_no_queries()
+

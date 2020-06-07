@@ -4,6 +4,7 @@ from collections import namedtuple
 from contextlib import contextmanager
 from datetime import timedelta
 from enum import Enum
+from functools import total_ordering
 from itertools import chain, dropwhile, islice, repeat
 
 from sqlalchemy import Boolean, Column, Integer, String, create_engine, event, func
@@ -99,9 +100,11 @@ class ActivityEdge(Base):
             and self.rising == other.rising
         )
 
+
     def __repr__(self):
         arrow = "⬈" if self.rising else "⬊"
         return f"<ActivityEdge {self.time} {arrow}>"
+
 
     @staticmethod
     def session_interval_cache(session):
@@ -158,29 +161,56 @@ def clip_span(span):
 class ActivityUpdater:
     def __init__(self, session):
         self.session = session
-        self.edges = []
+        self.boxed_edges = []
 
 
-    def update(self, start, end):
-        start_index = bisect_left(self.edges, start)
-        end_index = bisect_right(self.edges, end)
-        if start_index == 0 or end_index == len(self.edges):
-            self.edges = [*ActivityEdge.get_edges_including_bounds(self.session, start, end)]
-            
-        self.session.execute(ActivityEdge.__table__.delete().where(start <= ActivityEdge.time <= end))
-        self.update_bound(self.lower_bound, ActivityEdge(time=start, rising=True))
+    def update(self, start, value):
+        end = start + value
+        start_edge = ActivityEdge(time=start, rising=True)
         end_edge = ActivityEdge(time=end, rising=False)
-        if self.update_bound(self.upper_bound, end_edge):
-            self.lower_bound = end_edge
+        start_index = bisect_left(self.boxed_edges, ActivityEdgeOrderedByTime(start_edge))
+        end_index = bisect_right(self.boxed_edges, ActivityEdgeOrderedByTime(end_edge))
+        if start_index == 0 or end_index == len(self.boxed_edges):
+            self.boxed_edges = [ActivityEdgeOrderedByTime(edge) for edge in ActivityEdge.get_edges_including_bounds(self.session, start, end)]
+            start_index = 1
+            end_index = len(self.boxed_edges) - 1
+        lower_bound = self.boxed_edges[start_index - 1].edge
+        upper_bound = self.boxed_edges[end_index].edge
+        for i in range(start_index, end_index):
+            self.session.delete(self.boxed_edges[i].edge)
+        self.session.flush()
+        self.boxed_edges = []
+        self.update_bound(lower_bound, start_edge)
+        self.update_bound(upper_bound, end_edge)
+        self.boxed_edges.sort()
 
 
     def update_bound(self, bound, edge):
+        bound_deleted = False
         if bound.rising != edge.rising:
             if abs(bound.time - edge.time) < min_pause:
                 self.session.delete(bound)
+                bound_deleted = True
             else:
+                self.boxed_edges.append(ActivityEdgeOrderedByTime(edge))
                 self.session.add(edge)
-                return True
+        if not bound_deleted:
+            self.boxed_edges.append(ActivityEdgeOrderedByTime(bound))
+
+
+@total_ordering
+class ActivityEdgeOrderedByTime:
+    def __init__(self, edge):
+        self.edge = edge
+
+    def __eq__(self, other):
+        return isinstance(other, ActivityEdgeOrderedByTime) and self.edge.time == other.edge.time
+
+    def __lt__(self, other):
+        if not isinstance(other, ActivityEdgeOrderedByTime):
+            return NotImplemented
+        return self.edge.time < other.edge.time
+
 
 
 class EventType(Enum):
@@ -234,12 +264,12 @@ def update_cache(cache, now, session, host, data, position):
     if day_start != today_start:
         day_start = today_start
         daily_total = None
-    pause_updater = ActivityUpdater(session)
+    activity_updater = ActivityUpdater(session)
 
     for event_type_id, value, time in struct.iter_unpack(data_format, data):
         event_type = EventType(event_type_id)
         if event_type == EventType.action:
-            activity_increase = pause_updater.update(time, value)
+            activity_increase = activity_updater.update(time, value)
             if daily_total is not None and is_on_day(time, day_start):
                 # this could attribute the activity_increase to the wrong day_start if
                 # activity occurs at day_start boundary, but it can only be wrong
@@ -258,8 +288,7 @@ def update_cache(cache, now, session, host, data, position):
         today_end = today_start + timedelta(days=1).total_seconds()
         daily_total = ActivityEdge.activity_total(session, today_start, today_end)
     delta.update(day_start=day_start, daily_total=daily_total)
-    if pause_updater.updated:
-        delta.update(ActivityEdge.session_interval_cache(session))
+    delta.update(ActivityEdge.session_interval_cache(session))
     session.commit()
     cache.update(delta)
 
