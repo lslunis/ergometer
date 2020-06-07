@@ -100,11 +100,9 @@ class ActivityEdge(Base):
             and self.rising == other.rising
         )
 
-
     def __repr__(self):
         arrow = "⬈" if self.rising else "⬊"
         return f"<ActivityEdge {self.time} {arrow}>"
-
 
     @staticmethod
     def session_interval_cache(session):
@@ -163,15 +161,21 @@ class ActivityUpdater:
         self.session = session
         self.boxed_edges = []
 
-
     def update(self, start, value):
         end = start + value
         start_edge = ActivityEdge(time=start, rising=True)
         end_edge = ActivityEdge(time=end, rising=False)
-        start_index = bisect_left(self.boxed_edges, ActivityEdgeOrderedByTime(start_edge))
+        start_index = bisect_left(
+            self.boxed_edges, ActivityEdgeOrderedByTime(start_edge)
+        )
         end_index = bisect_right(self.boxed_edges, ActivityEdgeOrderedByTime(end_edge))
         if start_index == 0 or end_index == len(self.boxed_edges):
-            self.boxed_edges = [ActivityEdgeOrderedByTime(edge) for edge in ActivityEdge.get_edges_including_bounds(self.session, start, end)]
+            self.boxed_edges = [
+                ActivityEdgeOrderedByTime(edge)
+                for edge in ActivityEdge.get_edges_including_bounds(
+                    self.session, start, end
+                )
+            ]
             start_index = 1
             end_index = len(self.boxed_edges) - 1
         lower_bound = self.boxed_edges[start_index - 1].edge
@@ -183,7 +187,6 @@ class ActivityUpdater:
         self.update_bound(lower_bound, start_edge)
         self.update_bound(upper_bound, end_edge)
         self.boxed_edges.sort()
-
 
     def update_bound(self, bound, edge):
         bound_deleted = False
@@ -204,13 +207,15 @@ class ActivityEdgeOrderedByTime:
         self.edge = edge
 
     def __eq__(self, other):
-        return isinstance(other, ActivityEdgeOrderedByTime) and self.edge.time == other.edge.time
+        return (
+            isinstance(other, ActivityEdgeOrderedByTime)
+            and self.edge.time == other.edge.time
+        )
 
     def __lt__(self, other):
         if not isinstance(other, ActivityEdgeOrderedByTime):
             return NotImplemented
         return self.edge.time < other.edge.time
-
 
 
 class EventType(Enum):

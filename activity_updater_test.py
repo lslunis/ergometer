@@ -129,4 +129,3 @@ def test_query_frequency():
 
         activity_updater.update(60, 1)
         query_counter.expect_no_queries()
-
