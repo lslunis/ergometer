@@ -1,4 +1,5 @@
 import struct
+from bisect import bisect_left, bisect_right
 from collections import namedtuple
 from contextlib import contextmanager
 from datetime import timedelta
@@ -157,56 +158,29 @@ def clip_span(span):
 class ActivityUpdater:
     def __init__(self, session):
         self.session = session
-        self.start = None
-        self.pause = None
-        self.updated = False
+        self.edges = []
 
-    def seek(self, time):
-        if self.pause and self.start <= time < self.pause.end:
-            return
-        self.pause = (
-            self.session.query(ActivityEdge)
-            .filter(time < ActivityEdge.end)
-            .order_by(ActivityEdge.end)
-            .limit(1)
-            .one_or_none()
-        )
-        if not self.pause:
-            self.pause = ActivityEdge(start=0, end=max_time)
-            self.session.add(self.pause)
-        self.start = min(time, self.pause.start)
 
-    def update(self, time, value):
-        # enforces non-overlapping intervals
-        die_unless(value == 1, f"unexpected value: {value}")
-        self.seek(time)
-        left_span = time - self.pause.start
-        if left_span < 0:
-            return 0
+    def update(self, start, end):
+        start_index = bisect_left(self.edges, start)
+        end_index = bisect_right(self.edges, end)
+        if start_index == 0 or end_index == len(self.edges):
+            self.edges = [*ActivityEdge.get_edges_including_bounds(self.session, start, end)]
+            
+        self.session.execute(ActivityEdge.__table__.delete().where(start <= ActivityEdge.time <= end))
+        self.update_bound(self.lower_bound, ActivityEdge(time=start, rising=True))
+        end_edge = ActivityEdge(time=end, rising=False)
+        if self.update_bound(self.upper_bound, end_edge):
+            self.lower_bound = end_edge
 
-        span = self.pause.end - self.pause.start
-        right_span = span - left_span - value
-        left_span = clip_span(left_span)
-        right_span = clip_span(right_span)
-        activity_increase = span - left_span - right_span
-        die_unless(
-            0 < activity_increase < 2 * min_pause,
-            f"unexpected activity_increase: {activity_increase}",
-        )
 
-        if right_span:
-            self.pause.start = self.pause.end - right_span
-        else:
-            self.session.delete(self.pause)
-            self.session.flush()
-            self.pause = None
-
-        if left_span:
-            self.session.add(ActivityEdge(start=(time - left_span), end=time))
-            self.start = time
-
-        self.updated = True
-        return activity_increase
+    def update_bound(self, bound, edge):
+        if bound.rising != edge.rising:
+            if abs(bound.time - edge.time) < min_pause:
+                self.session.delete(bound)
+            else:
+                self.session.add(edge)
+                return True
 
 
 class EventType(Enum):
