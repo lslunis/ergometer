@@ -117,28 +117,29 @@ class ActivityEdge(Base):
 
     @staticmethod
     def activity_total(session, start, end):
-        edges = ActivityEdge.get_edges_including_bounds(session, start, end)
-        edges = dropwhile(lambda edge: not edge.rising, edges)
-
-        activities = (
-            Interval(max(activity_start.time, start), min(activity_end.time, end))
-            for activity_start, activity_end in pairwise(edges)
+        edges = get_edges_including_bounds(session, start, end)
+        activities = get_overlapping_intervals(edges, start, end)
+        return sum(
+            min(activity.end.time, end) - max(activity.start.time, start)
+            for activity in activities
         )
 
-        return sum(activity.end - activity.start for activity in activities)
 
-    @staticmethod
-    def get_edges_including_bounds(session, start, end):
-        lower_bound = session.query(func.max(ActivityEdge.time)).filter(
-            ActivityEdge.time < start
-        )
-        edges = (
-            session.query(ActivityEdge)
-            .filter(ActivityEdge.time >= lower_bound)
-            .order_by(ActivityEdge.time)
-        )
+def get_edges_including_bounds(session, start, end):
+    lower_bound = session.query(func.max(ActivityEdge.time)).filter(
+        ActivityEdge.time < start
+    )
+    edges = (
+        session.query(ActivityEdge)
+        .filter(ActivityEdge.time >= lower_bound)
+        .order_by(ActivityEdge.time)
+    )
+    return takeuntil_inclusive(lambda edge: edge.time > end, edges)
 
-        return takeuntil_inclusive(lambda edge: edge.time > end, edges)
+
+def get_overlapping_intervals(edges, start, end, as_pauses=False):
+    edges = dropwhile(lambda edge: edge.rising == as_pauses, edges)
+    return (Interval(start_edge, end_edge) for start_edge, end_edge in pairwise(edges))
 
 
 @event.listens_for(ActivityEdge.__table__, "after_create")
@@ -165,6 +166,8 @@ class ActivityUpdater:
         end = start + value
         start_edge = ActivityEdge(time=start, rising=True)
         end_edge = ActivityEdge(time=end, rising=False)
+        activity = Interval(start_edge, end_edge)
+
         start_index = bisect_left(
             self.boxed_edges, ActivityEdgeOrderedByTime(start_edge)
         )
@@ -172,33 +175,47 @@ class ActivityUpdater:
         if start_index == 0 or end_index == len(self.boxed_edges):
             self.boxed_edges = [
                 ActivityEdgeOrderedByTime(edge)
-                for edge in ActivityEdge.get_edges_including_bounds(
-                    self.session, start, end
-                )
+                for edge in get_edges_including_bounds(self.session, start, end)
             ]
             start_index = 1
             end_index = len(self.boxed_edges) - 1
-        lower_bound = self.boxed_edges[start_index - 1].edge
-        upper_bound = self.boxed_edges[end_index].edge
-        for i in range(start_index, end_index):
-            self.session.delete(self.boxed_edges[i].edge)
-        self.session.flush()
-        self.boxed_edges = []
-        self.update_bound(lower_bound, start_edge)
-        self.update_bound(upper_bound, end_edge)
-        self.boxed_edges.sort()
 
-    def update_bound(self, bound, edge):
-        bound_deleted = False
-        if bound.rising != edge.rising:
-            if abs(bound.time - edge.time) < min_pause:
-                self.session.delete(bound)
-                bound_deleted = True
-            else:
-                self.boxed_edges.append(ActivityEdgeOrderedByTime(edge))
-                self.session.add(edge)
-        if not bound_deleted:
-            self.boxed_edges.append(ActivityEdgeOrderedByTime(bound))
+        boxed_bounds = dict(
+            start=self.boxed_edges[start_index - 1], end=self.boxed_edges[end_index],
+        )
+        edges = [
+            self.boxed_edges[i].edge for i in range(start_index - 1, end_index + 1)
+        ]
+        pauses = get_overlapping_intervals(edges, start, end, as_pauses=True)
+
+        self.boxed_edges = []
+        bound_deleted = {}
+        total = 0
+
+        for pause in pauses:
+            total += pause.end.time - pause.start.time
+            for x in ("start", "end"):
+                activity_edge = getattr(activity, x)
+                pause_edge = getattr(pause, x)
+                sign = 1 if activity_edge.rising else -1
+                d = sign * (activity_edge.time - pause_edge.time)
+                if d >= min_pause:
+                    total -= d
+                    self.boxed_edges.append(ActivityEdgeOrderedByTime(activity_edge))
+                    self.session.add(activity_edge)
+                else:
+                    if d > 0:
+                        bound_deleted[x] = True
+                    self.session.delete(pause_edge)
+
+        self.session.flush()
+
+        for x in ("start", "end"):
+            if not bound_deleted.get(x):
+                self.boxed_edges.append(boxed_bounds[x])
+
+        self.boxed_edges.sort()
+        return total
 
 
 @total_ordering
