@@ -124,22 +124,39 @@ def test_query_frequency():
         session = Session()
         query_counter = QueryCounter(session)
         activity_updater = ActivityUpdater(query_counter)
-        add_activity(session, 25, 30, 70, 75)
+
+        activity_updater.update(25, 1)
+        query_counter.expect_queries()
+
+        activity_updater.update(26, 1)
+        query_counter.expect_no_queries()
 
         activity_updater.update(27, 1)
-        query_counter.expect_queries()
-
-        activity_updater.update(29, 1)
-        query_counter.expect_queries()
-
-        activity_updater.update(45, 1)
         query_counter.expect_no_queries()
 
-        activity_updater.update(40, 1)
+        activity_updater.update(30, 1)
         query_counter.expect_no_queries()
 
-        activity_updater.update(50, 1)
-        query_counter.expect_queries()
+        activity_updater.update(35, 1)
+        query_counter.expect_no_queries()
 
-        activity_updater.update(60, 1)
+        activity_updater.update(36, 1)
+        query_counter.expect_no_queries()
+
+        activity_updater.update(55, 1)
+        query_counter.expect_no_queries()
+
+        activity_updater.update(75, 1)
+        query_counter.expect_no_queries()
+
+        activity_updater.update(76, 1)
+        query_counter.expect_no_queries()
+
+        activity_updater.update(95, 1)
+        query_counter.expect_no_queries()
+
+        activity_updater.update(100, 1)
+        query_counter.expect_no_queries()
+
+        activity_updater.update(120, 1)
         query_counter.expect_no_queries()

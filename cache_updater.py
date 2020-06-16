@@ -168,10 +168,11 @@ class ActivityUpdater:
         end_edge = ActivityEdge(time=end, rising=False)
         activity = Interval(start_edge, end_edge)
 
-        start_index = bisect_left(
+        # lower bound <= start < end <= upper bound
+        start_index = bisect_right(
             self.boxed_edges, ActivityEdgeOrderedByTime(start_edge)
         )
-        end_index = bisect_right(self.boxed_edges, ActivityEdgeOrderedByTime(end_edge))
+        end_index = bisect_left(self.boxed_edges, ActivityEdgeOrderedByTime(end_edge))
         if start_index == 0 or end_index == len(self.boxed_edges):
             self.boxed_edges = [
                 ActivityEdgeOrderedByTime(edge)
