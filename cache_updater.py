@@ -105,23 +105,34 @@ class ActivityEdge(Base):
         return f"<ActivityEdge {self.time} {arrow}>"
 
     @staticmethod
-    def session_interval_cache(session):
-        rest_target = Setting.get(session, EventType.rest_target).value
-        edges = session.query(ActivityEdge).order_by(ActivityEdge.time.desc())
-        pauses = (Interval(start.time, end.time) for end, start in pairwise(edges))
-        rests = (p for p in pauses if (p.end - p.start) >= rest_target)
-        last_rest, prior_rest = islice(
-            chain(islice(rests, 2), repeat(Interval(0, 0))), 2
-        )
-        return dict(session_start=prior_rest.end, session_end=last_rest.start)
-
-    @staticmethod
     def activity_total(session, start, end):
         edges = get_edges_including_bounds(session, start, end)
         activities = get_overlapping_intervals(edges, start, end)
         return sum(
             min(activity.end.time, end) - max(activity.start.time, start)
             for activity in activities
+        )
+
+    @staticmethod
+    def session_start(session):
+        rest_target = Setting.get(session, EventType.rest_target).value
+        edges = session.query(ActivityEdge).order_by(ActivityEdge.time.desc())
+        pauses = (Interval(start.time, end.time) for end, start in pairwise(edges))
+        rests = (p for p in pauses if (p.end - p.start) >= rest_target)
+        try:
+            last_rest, prior_rest = islice(rests, 2)
+            return prior_rest.end
+        except ValueError:
+            return 0
+
+    @staticmethod
+    def rest_start(session):
+        return (
+            session.query(ActivityEdge)
+            .order_by(ActivityEdge.time.desc())
+            .slice(1, 2)
+            .one()
+            .time
         )
 
 
@@ -250,7 +261,11 @@ class EventType(Enum):
         return self
 
 
-Interval = namedtuple("Interval", ["start", "end"])
+class Interval(namedtuple("Interval", ["start", "end"])):
+    def overlaps(self, *args):
+        other = Interval(*args)
+        return self.start < other.start < self.end or self.start < other.end < self.end
+
 
 data_format = "<BxxxIQ"
 
@@ -258,19 +273,20 @@ data_format = "<BxxxIQ"
 @retry_on(PositionError)
 async def cache_updater(cache, broker):
     Session = connect("sqlite:///cache.db")
-    host_positions = initialize_cache(cache, imprecise_clock(), Session())
+    host_positions = init_cache(cache, imprecise_clock(), Session())
     async for args in broker.subscribe(host_positions):
         update_cache(cache, imprecise_clock(), Session(), *args)
 
 
-def initialize_cache(cache, now, session):
+def init_cache(cache, now, session):
     today_start = day_start_of(now)
     today_end = today_start + timedelta(days=1).total_seconds()
     delta = {
         **{s.name: s.value for s in session.query(Setting)},
         "day_start": today_start,
         "daily_total": ActivityEdge.activity_total(session, today_start, today_end),
-        **ActivityEdge.session_interval_cache(session),
+        "session_start": ActivityEdge.session_start(session),
+        "rest_start": ActivityEdge.rest_start(session),
     }
     host_positions = {hp.host: hp.position for hp in session.query(HostPosition)}
     session.commit()
@@ -288,10 +304,16 @@ def update_cache(cache, now, session, host, data, position):
         day_start = today_start
         daily_total = None
     activity_updater = ActivityUpdater(session)
+    min_activity_start = None
+    max_activity_end = None
 
     for event_type_id, value, time in struct.iter_unpack(data_format, data):
         event_type = EventType(event_type_id)
         if event_type == EventType.action:
+            if min_activity_start is None or time < min_activity_start:
+                min_activity_start = time
+            if max_activity_end is None or time + value > max_activity_end:
+                max_activity_end = time + value
             activity_increase = activity_updater.update(time, value)
             if daily_total is not None and is_on_day(time, day_start):
                 # this could attribute the activity_increase to the wrong day_start if
@@ -302,16 +324,34 @@ def update_cache(cache, now, session, host, data, position):
             setting = Setting.get(session, event_type)
             setting.update_if_newer(value, time)
 
-    delta = {
-        setting.name: setting.value
-        for setting in session.dirty
-        if isinstance(setting, Setting)
-    }
+    delta = {}
+    rest_target_changed = False
+    for setting in session.dirty:
+        if isinstance(setting, Setting):
+            delta[setting.name] = setting.value
+            if setting.name == "rest_target":
+                rest_target_changed = True
+
     if daily_total is None:
         today_end = today_start + timedelta(days=1).total_seconds()
         daily_total = ActivityEdge.activity_total(session, today_start, today_end)
     delta.update(day_start=day_start, daily_total=daily_total)
-    delta.update(ActivityEdge.session_interval_cache(session))
+    session_start = cache["session_start"]
+    rest_start = cache["rest_start"]
+    rest_target = delta.get("rest_target") or cache["rest_target"]
+    if (
+        rest_target_changed
+        or min_activity_start is not None
+        and max_activity_end is not None
+        and Interval(min_activity_start, max_activity_end).overlaps(
+            session_start - rest_target, session_start
+        )
+        or max_activity_end is not None
+        and max_activity_end >= rest_start + rest_target
+    ):
+        delta["session_start"] = ActivityEdge.session_start(session)
+    if max_activity_end is not None and max_activity_end > rest_start:
+        delta["rest_start"] = max_activity_end
     session.commit()
     cache.update(delta)
 
