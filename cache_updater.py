@@ -1,6 +1,5 @@
 import struct
 from bisect import bisect_left, bisect_right
-from collections import namedtuple
 from contextlib import contextmanager
 from enum import Enum
 from functools import total_ordering
@@ -11,7 +10,14 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
 from .time import day_start_of, imprecise_clock, in_seconds, is_on_day, max_time
-from .util import PositionError, die_unless, pairwise, retry_on, takeuntil_inclusive
+from .util import (
+    Interval,
+    PositionError,
+    die_unless,
+    pairwise,
+    retry_on,
+    takeuntil_inclusive,
+)
 
 Session = sessionmaker()
 
@@ -263,13 +269,6 @@ class EventType(Enum):
 
 
 setting_types = [t for t in EventType.__members__.values() if t.is_setting]
-
-
-class Interval(namedtuple("Interval", ["start", "end"])):
-    def overlaps(self, *args):
-        other = Interval(*args)
-        return self.start < other.start < self.end or self.start < other.end < self.end
-
 
 data_format = "<BxxxIQ"
 

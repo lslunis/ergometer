@@ -1,4 +1,10 @@
-from .util import pairwise, takeuntil_inclusive
+from .util import Interval, pairwise, takeuntil_inclusive
+
+
+def test_interval_overlaps():
+    assert Interval(0, 2).overlaps(1, 3)
+    assert not Interval(0, 2).overlaps(2, 4)
+    assert Interval(0, 4).overlaps(1, 3)
 
 
 def test_pairwise():

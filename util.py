@@ -1,7 +1,8 @@
 import asyncio
-from warnings import warn
+from collections import namedtuple
 from functools import wraps
 from itertools import takewhile
+from warnings import warn
 
 
 class FatalError(Exception):
@@ -15,6 +16,12 @@ class PositionError(Exception):
 def die_unless(cond, message):
     if not cond:
         raise Exception(message)
+
+
+class Interval(namedtuple("Interval", ["start", "end"])):
+    def overlaps(self, *args):
+        other = Interval(*args)
+        return self.start < other.start < self.end or self.start < other.end < self.end
 
 
 def pairwise(iterable):
