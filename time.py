@@ -13,7 +13,7 @@ def day_start_of(dt):
 
 
 def is_on_day(time, day_start):
-    return day_start <= time < day_start + timedelta(days=1).total_seconds()
+    return day_start <= time < day_start + in_seconds(days=1)
 
 
 def imprecise_clock():
@@ -27,3 +27,7 @@ def precise_clock():
 # SQLite uses variable length integers, so limit the size that timestamps will take up
 # https://sqlite.org/src4/doc/trunk/www/varint.wiki
 max_time = 2 ** 40 - 1
+
+
+def in_seconds(**kw):
+    return timedelta(**kw).total_seconds()

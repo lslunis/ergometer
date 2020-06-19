@@ -2,7 +2,6 @@ import struct
 from bisect import bisect_left, bisect_right
 from collections import namedtuple
 from contextlib import contextmanager
-from datetime import timedelta
 from enum import Enum
 from functools import total_ordering
 from itertools import chain, dropwhile, islice, repeat
@@ -11,7 +10,7 @@ from sqlalchemy import Boolean, Column, Integer, String, create_engine, event, f
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-from .time import day_start_of, imprecise_clock, is_on_day, max_time
+from .time import day_start_of, imprecise_clock, in_seconds, is_on_day, max_time
 from .util import PositionError, die_unless, pairwise, retry_on, takeuntil_inclusive
 
 Session = sessionmaker()
@@ -68,17 +67,6 @@ class Setting(Base):
     value = Column(Integer, nullable=False)
     time = Column(Integer, nullable=False)
 
-    @staticmethod
-    def get(session, event_type):
-        die_unless(event_type.default_value, f"unexpected: {event_type}")
-        id = event_type.value
-        setting = session.query(Setting).get(id)
-        exists = setting is not None
-        if not exists:
-            setting = Setting(id=id, value=event_type.default_value, time=0)
-            session.add(setting)
-        return setting
-
     @property
     def name(self):
         return EventType(self.id).name
@@ -115,7 +103,7 @@ class ActivityEdge(Base):
 
     @staticmethod
     def session_start(session):
-        rest_target = Setting.get(session, EventType.rest_target).value
+        rest_target = EventType.rest_target.get(session).value
         edges = session.query(ActivityEdge).order_by(ActivityEdge.time.desc())
         pauses = (Interval(start.time, end.time) for end, start in pairwise(edges))
         rests = (p for p in pauses if (p.end - p.start) >= rest_target)
@@ -249,16 +237,32 @@ class ActivityEdgeOrderedByTime:
 
 class EventType(Enum):
     action = 0
-    daily_target = (1, timedelta(hours=8))
-    session_target = (2, timedelta(hours=1))
-    rest_target = (3, timedelta(minutes=5))
+    daily_target = (1, in_seconds(hours=8))
+    session_target = (2, in_seconds(hours=1))
+    rest_target = (3, in_seconds(minutes=5))
 
     def __new__(cls, value, default=None):
         self = object.__new__(cls)
         self._value_ = value
-        if default:
-            self.default_value = default.total_seconds()
+        self.default = default
         return self
+
+    @property
+    def is_setting(self):
+        return self.default is not None
+
+    def get(self, session):
+        die_unless(self.is_setting, f"unexpected: {self}")
+        id = self.value
+        setting = session.query(Setting).get(id)
+        exists = setting is not None
+        if not exists:
+            setting = Setting(id=id, value=self.default, time=0)
+            session.add(setting)
+        return setting
+
+
+setting_types = [t for t in EventType.__members__.values() if t.is_setting]
 
 
 class Interval(namedtuple("Interval", ["start", "end"])):
@@ -280,14 +284,16 @@ async def cache_updater(cache, broker):
 
 def init_cache(cache, now, session):
     today_start = day_start_of(now)
-    today_end = today_start + timedelta(days=1).total_seconds()
+    today_end = today_start + in_seconds(days=1)
     delta = {
-        **{s.name: s.value for s in session.query(Setting)},
         "day_start": today_start,
         "daily_total": ActivityEdge.activity_total(session, today_start, today_end),
         "session_start": ActivityEdge.session_start(session),
         "rest_start": ActivityEdge.rest_start(session),
     }
+    for type in setting_types:
+        setting = type.get(session)
+        delta[setting.name] = setting.value
     host_positions = {hp.host: hp.position for hp in session.query(HostPosition)}
     session.commit()
     cache.update(delta)
@@ -320,9 +326,10 @@ def update_cache(cache, now, session, host, data, position):
                 # activity occurs at day_start boundary, but it can only be wrong
                 # by less than min_idle seconds
                 daily_total += activity_increase
+        elif event_type.is_setting:
+            event_type.get(session).update_if_newer(value, time)
         else:
-            setting = Setting.get(session, event_type)
-            setting.update_if_newer(value, time)
+            ...  # TODO warn
 
     delta = {}
     rest_target_changed = False
@@ -333,7 +340,7 @@ def update_cache(cache, now, session, host, data, position):
                 rest_target_changed = True
 
     if daily_total is None:
-        today_end = today_start + timedelta(days=1).total_seconds()
+        today_end = today_start + in_seconds(days=1)
         daily_total = ActivityEdge.activity_total(session, today_start, today_end)
     delta.update(day_start=day_start, daily_total=daily_total)
     session_start = cache["session_start"]

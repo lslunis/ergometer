@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from .time import day_start_of
+from .time import day_start_of, in_seconds
 
 
 def test_day_of():
@@ -31,3 +31,7 @@ def test_day_of():
         datetime.fromtimestamp(day_start_of(slight_earlier_than_today_start))
         == yesterday_start
     )
+
+
+def test_in_seconds():
+    assert in_seconds(days=1) == 86400

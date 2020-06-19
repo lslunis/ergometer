@@ -1,7 +1,8 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 
-from .cache_updater import connect, ActivityEdge
 from .activity_test_util import add_activity
+from .cache_updater import ActivityEdge, connect
+from .time import in_seconds
 
 
 def iso(s):
@@ -30,7 +31,7 @@ def test_one_pause_in_a_day():
         total = ActivityEdge.activity_total(
             session, iso("2020-05-23 04"), iso("2020-05-24 04")
         )
-        assert total == timedelta(hours=2).total_seconds()
+        assert total == in_seconds(hours=2)
 
 
 def test_pauses_overlap_day_boundaries():
@@ -40,4 +41,4 @@ def test_pauses_overlap_day_boundaries():
         total = ActivityEdge.activity_total(
             session, iso("2020-05-23 04"), iso("2020-05-24 04")
         )
-        assert total == timedelta(hours=22).total_seconds()
+        assert total == in_seconds(hours=22)
