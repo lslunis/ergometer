@@ -1,8 +1,9 @@
 import asyncio
-from data_processor import *
-from util import die_unless, FatalError
+
 import websockets
-import messages as m
+
+from . import messages as m
+from .util import FatalError
 
 BATCH_SIZE = 100
 
@@ -22,6 +23,12 @@ async def read_with_host(file_manager, host, position, batch_size):
 
 # Handles "read" calls. Sends an unending stream of data to a client.
 async def send_updates(file_manager, websocket, client_positions, exclude=None):
+    for host, pos, data in subscribe(file_manager, client_positions, exclude):
+        msg = m.ReadResponse(None, host=host, pos=pos, data=data)
+        await websocket.send(msg.encode())
+
+
+async def subscribe(file_manager, client_positions, exclude=None):
     while True:
         pending = set(
             [
@@ -58,8 +65,7 @@ async def send_updates(file_manager, websocket, client_positions, exclude=None):
                     )
                 )
                 client_positions[host_completed] = pos + len(data)
-                msg = m.ReadResponse(None, host=host_completed, pos=pos, data=data)
-                await websocket.send(msg.encode())
+                yield host_completed, pos, data
 
             # If there's a new file reset everything. Otherwise keep
             # awaitng the next task.
@@ -93,18 +99,3 @@ def client_handler(file_manager):
             pass
 
     return handle_client
-
-
-async def main():
-    storage_root = sys.argv[1]
-    port = sys.argv[2]
-    file_manager = FileManager("broker", storage_root, asyncio.Event())
-    await websockets.serve(client_handler(file_manager), "localhost", port)
-
-
-if __name__ == "__main__":
-    if platform.system() == "Windows":
-        loop = asyncio.ProactorEventLoop()
-        asyncio.set_event_loop(loop)
-    asyncio.get_event_loop().run_until_complete(main())
-    asyncio.get_event_loop().run_forever()

@@ -1,13 +1,10 @@
 #!/bin/bash
 
-# Not sure what the equivalent of this would be in windows.
+# TODO: move to dev.py
 
-# Make directories for data.
 mkdir -p test-data/{client-1,client-2,server}
 
-# Start clients.
-python3 data_processor_main.py `pwd`/test-data/client-1/ ws://localhost:8080 &
-python3 data_processor_main.py `pwd`/test-data/client-2/ ws://localhost:8080 &
+ergometer/venv/bin/python -m ergometer.client_main `pwd`/test-data/client-1/ ws://localhost:8080 &
+ergometer/venv/bin/python -m ergometer.client_main `pwd`/test-data/client-2/ ws://localhost:8080 &
 
-# Start broker.
-python3 broker.py `pwd`/test-data/server/ 8080 &
+ergometer/venv/bin/python -m ergometer.server_main `pwd`/test-data/server/ 8080 &

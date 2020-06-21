@@ -9,6 +9,7 @@ from sqlalchemy import Boolean, Column, Integer, String, create_engine, event, f
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
+from .broker import subscribe
 from .time import day_start_of, imprecise_clock, in_seconds, is_on_day, max_time
 from .util import (
     Interval,
@@ -274,11 +275,11 @@ data_format = "<BxxxIQ"
 
 
 @retry_on(PositionError)
-async def cache_updater(cache, broker):
-    Session = connect("sqlite:///cache.db")
-    host_positions = init_cache(cache, imprecise_clock(), Session())
-    async for args in broker.subscribe(host_positions):
-        update_cache(cache, imprecise_clock(), Session(), *args)
+async def cache_updater(cache, file_manager):
+    with connect("sqlite:///cache.db") as Session:
+        host_positions = init_cache(cache, imprecise_clock(), Session())
+        async for args in subscribe(file_manager, host_positions):
+            update_cache(cache, imprecise_clock(), Session(), *args)
 
 
 def init_cache(cache, now, session):
@@ -299,7 +300,7 @@ def init_cache(cache, now, session):
     return host_positions
 
 
-def update_cache(cache, now, session, host, data, position):
+def update_cache(cache, now, session, host, position, data):
     HostPosition.update(session, host, data, position)
 
     today_start = day_start_of(now)

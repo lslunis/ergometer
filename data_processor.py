@@ -1,21 +1,22 @@
-import websockets
-import platform
 import asyncio
 import asyncio.subprocess
 import glob
 import os
 import os.path as path
-import sys
 import uuid
-from util import FatalError, die_unless, retry_on, retry_on_iter
-import messages as m
+
+import websockets
+
+from . import messages as m
+from .util import FatalError, die_unless, retry_on, retry_on_iter
+
 
 # trim at startup
 # mark irrecoverable data
 
 
 class IntegrityError(Exception):
-    pass
+    ...
 
 
 # Read local events for "host", writing them to "broker".

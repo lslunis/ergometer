@@ -1,12 +1,24 @@
 import asyncio
-from data_processor import *
-from util import die_unless
+import sys
+
+from .cache_updater import cache_updater
+from .data_processor import (
+    BrokerClient,
+    change_subscriber,
+    FileManager,
+    get_current_host,
+    local_event_handler,
+    publish_local_events,
+    run_subprocess,
+)
+from .util import die_unless
 
 
 async def main():
     storage_root = sys.argv[1]
     cloud_broker_address = sys.argv[2]
 
+    cache = {}
     error_event = asyncio.Event()
     host = get_current_host(storage_root)
     die_unless(len(host) > 0, "host is empty")
@@ -30,11 +42,8 @@ async def main():
 
     await asyncio.gather(
         subscriber, publisher, subprocess, local_events,
+        asyncio.create_task(cache_updater(cache, file_manager))
     )
 
 
-if __name__ == "__main__":
-    if platform.system() == "Windows":
-        loop = asyncio.ProactorEventLoop()
-        asyncio.set_event_loop(loop)
-    asyncio.get_event_loop().run_until_complete(main())
+asyncio.get_event_loop().run_until_complete(main())
