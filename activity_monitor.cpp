@@ -20,7 +20,7 @@ HINSTANCE g_hinst;
 
 bool g_wasActive = false;
 
-vector<DWORD> g_buttonCountDenyList; // both keyboards and mice
+vector<DWORD> g_buttonCountIgnoreList; // both keyboards and mice
 
 struct Guard_DefRawInputProc {
     RAWINPUT* input;
@@ -81,8 +81,8 @@ void OnInput(HRAWINPUT hRawInput) {
                                    ? device_info.keyboard.dwNumberOfKeysTotal
                                    : device_info.mouse.dwNumberOfButtons;
 
-    if (find(g_buttonCountDenyList.begin(), g_buttonCountDenyList.end(), button_count)
-        != g_buttonCountDenyList.end()) {
+    if (find(g_buttonCountIgnoreList.begin(), g_buttonCountIgnoreList.end(), button_count)
+        != g_buttonCountIgnoreList.end()) {
         return; // skip keyboards/mice with denied button counts
     }
 
@@ -132,7 +132,7 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE, LPSTR lpCmdLine, int) {
          it != end; ++it) {
         const ssub_match sm = *it;
         try {
-            g_buttonCountDenyList.push_back(static_cast<DWORD>(stoi(sm)));
+            g_buttonCountIgnoreList.push_back(static_cast<DWORD>(stoi(sm)));
         } catch (const out_of_range&) {
             fprintf(stderr, "Ignoring out-of-range command-line argument '%s'.\n",
                     sm.str().c_str());
