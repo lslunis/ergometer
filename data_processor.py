@@ -1,17 +1,18 @@
 import asyncio
 import asyncio.subprocess
 import glob
+import logging
 import os
 import os.path as path
 import uuid
+import struct
 import sys
-
 import websockets
 
 from . import messages as m
-from .database import database_updater
-from .util import FatalError, die_unless, retry_on, retry_on_iter
-
+from .database import database_updater, data_format, EventType
+from .time import imprecise_clock
+from .util import FatalError, die_unless, log, retry_on, retry_on_iter
 
 # trim at startup
 # mark irrecoverable data
@@ -23,6 +24,7 @@ class IntegrityError(Exception):
 
 # Read local events for "host", writing them to "broker".
 async def publish_local_events(host, broker, file_manager):
+    log.info("Starting publish_local_events")
     position = await broker.host_position(host)
     while True:
         data = await file_manager.read(host, position, 100)
@@ -31,6 +33,7 @@ async def publish_local_events(host, broker, file_manager):
 
 
 async def local_event_handler(host, pop_local_event, file_manager):
+    log.info("Starting local_event_handler")
     while True:
         events = []
         try:
@@ -47,18 +50,13 @@ async def local_event_handler(host, pop_local_event, file_manager):
 # "file_manager".
 @retry_on(Exception)
 async def change_subscriber(self_host, broker, file_manager):
+    log.info("Starting change_subscriber")
     # Initialize.
     positions = file_manager.positions
-    try:
-        # Read messages forever.
-        async for data_host, data, position in broker.read(
-            positions, exclude=self_host
-        ):
-            file_manager.write(data_host, [data], position=position)
-    except FatalError as fe:
-        raise fe
-    except Exception as e:
-        file_manager.log(str(e))
+
+    # Read messages forever.
+    async for data_host, data, position in broker.read(positions, exclude=self_host):
+        file_manager.write(data_host, [data], position=position)
 
 
 # A single file. Does error handling around reads and writes as well as
@@ -166,7 +164,7 @@ class FileManager:
 
     # Log an error message. A newline is automatically appended.
     def log(self, msg):
-        error_path = os.path.join(self.storage_root, "error.log")
+        error_path = os.path.join(self.storage_root, "file-manager-error.log")
         with open(error_path, "a") as f:
             full_message = msg + "\n"
             bytes_written = f.write(full_message)
@@ -281,6 +279,7 @@ def get_current_host(storage_root):
 
 
 async def run_subprocess(push_local_event, command, args):
+    log.info("Starting run_subprocess")
     subprocess = await asyncio.create_subprocess_exec(
         command, *args, stdout=asyncio.subprocess.PIPE
     )
@@ -289,6 +288,7 @@ async def run_subprocess(push_local_event, command, args):
 
 
 async def exit_watcher(is_exiting):
+    log.info("Starting exit_watcher")
     while True:
         if is_exiting():
             raise SystemExit
@@ -311,21 +311,33 @@ async def read_with_host(file_manager, host, position, batch_size):
     return (host, position, data)
 
 
-async def data_worker(model):
-    storage_root = sys.argv[1]
-    cloud_broker_address = sys.argv[2]
+async def activity_monitor(push_local_event):
+    log.info("Starting activity_monitor")
+    if os.name == "nt":
+        return await run_subprocess(model.push_local_event, "yes", ["0123456789ABCDEF"])
 
+    # Non-windows.
+    while True:
+        event = struct.pack(
+            data_format, EventType.action.value, 1, int(imprecise_clock().timestamp())
+        )
+        push_local_event(event)
+        await asyncio.sleep(1)
+
+
+async def data_worker(model):
+    log.info("Starting data worker")
     error_event = asyncio.Event()
-    host = get_current_host(storage_root)
+    host = get_current_host(model.storage_root)
     die_unless(len(host) > 0, "host is empty")
-    file_manager = FileManager(host, storage_root, error_event)
-    broker = BrokerClient(cloud_broker_address)
+    file_manager = FileManager(host, model.storage_root, error_event)
+    broker = BrokerClient(model.cloud_broker_address)
 
     try:
         await asyncio.gather(
             change_subscriber(host, broker, file_manager),
             publish_local_events(host, broker, file_manager),
-            run_subprocess(model.push_local_event, "yes", ["0123456789ABCDEF"]),
+            activity_monitor(model.push_local_event),
             local_event_handler(host, model.pop_local_event, file_manager),
             database_updater(model.Session, model.update_cache, file_manager.subscribe),
             exit_watcher(model.is_exiting),

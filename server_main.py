@@ -1,17 +1,16 @@
 import asyncio
+import os
 import sys
 
 import websockets
 
-from .broker import client_handler
 from .data_processor import FileManager
 from . import messages as m
-from .util import FatalError
-
+from .util import init, FatalError
 
 # Handles "read" calls. Sends an unending stream of data to a client.
 async def send_updates(file_manager, websocket, client_positions, exclude=None):
-    for host, pos, data in file_manager.subscribe(client_positions, exclude):
+    async for host, pos, data in file_manager.subscribe(client_positions, exclude):
         msg = m.ReadResponse(None, host=host, pos=pos, data=data)
         await websocket.send(msg.encode())
 
@@ -45,9 +44,9 @@ def client_handler(file_manager):
 
 
 async def main():
-    storage_root = sys.argv[1]
+    init()
     port = sys.argv[2]
-    file_manager = FileManager("broker", storage_root, asyncio.Event())
+    file_manager = FileManager("broker", ".", asyncio.Event())
     await websockets.serve(client_handler(file_manager), "localhost", port)
 
 

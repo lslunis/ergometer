@@ -1,7 +1,12 @@
+import logging
+import os
 from random import randint
+import sys
 
 import wx
 import wx.adv
+from .model import Model
+from .util import init
 
 Color = wx.Colour
 
@@ -39,19 +44,27 @@ class Tray(wx.adv.TaskBarIcon):
 
 
 def exit(*args):
+    log.info("Ergometer exiting")
+    model.exit()
     tray.RemoveIcon()
     tray.Destroy()
     frame.Destroy()
+    log.info("Ergometer exited")
 
 
-app = wx.App()
-frame = wx.Frame(
-    None,
-    style=wx.TRANSPARENT_WINDOW | wx.STAY_ON_TOP | wx.FRAME_TOOL_WINDOW | wx.MAXIMIZE,
-)
-frame.SetTransparent(128)
-frame.Show()
-tray = Tray()
-frame.Bind(wx.EVT_CLOSE, exit)
-
-app.MainLoop()
+if __name__ == "__main__":
+    init()
+    app = wx.App()
+    frame = wx.Frame(
+        None,
+        style=wx.TRANSPARENT_WINDOW
+        | wx.STAY_ON_TOP
+        | wx.FRAME_TOOL_WINDOW
+        | wx.MAXIMIZE,
+    )
+    frame.SetTransparent(128)
+    frame.Show()
+    tray = Tray()
+    frame.Bind(wx.EVT_CLOSE, exit)
+    model = Model()
+    app.MainLoop()

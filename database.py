@@ -1,6 +1,7 @@
 import struct
 from bisect import bisect_left, bisect_right
 from enum import Enum
+import logging
 from functools import total_ordering
 from itertools import chain, dropwhile, islice, repeat
 
@@ -8,12 +9,13 @@ from sqlalchemy import Boolean, Column, Integer, String, create_engine, event, f
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-from .time import day_start_of, in_seconds, is_on_day, max_time
+from .time import day_start_of, in_seconds, is_on_day, max_time, imprecise_clock
 from .util import (
     Interval,
     PositionError,
     die_unless,
     pairwise,
+    log,
     retry_on,
     takeuntil_inclusive,
 )
@@ -274,6 +276,7 @@ data_format = "<BxxxIQ"
 
 @retry_on(PositionError)
 async def database_updater(Session, update_cache, subscribe):
+    log.info("Starting database_updater")
     cache, host_positions = init(update_cache, imprecise_clock(), Session())
     async for args in subscribe(host_positions):
         cache = update_database(

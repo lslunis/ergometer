@@ -1,8 +1,13 @@
 import asyncio
+import logging
+import os
+import sys
 from collections import namedtuple
 from functools import wraps
 from itertools import takewhile
 from warnings import warn
+
+log = logging.getLogger("ergometer")
 
 
 class FatalError(Exception):
@@ -41,7 +46,7 @@ def retry_on(Error, return_on_success=False, retry_delay=None):
                 except FatalError as fe:
                     raise
                 except Error as e:
-                    warn(e)
+                    log.error(e)
                     if retry_delay is not None:
                         await asyncio.sleep(retry_delay)
 
@@ -61,7 +66,7 @@ def retry_on_iter(Error, retry_delay=None):
                 except FatalError as fe:
                     raise
                 except Error as e:
-                    warn(e)
+                    log.error(e)
                     if retry_delay is not None:
                         await asyncio.sleep(retry_delay)
 
@@ -75,3 +80,18 @@ def takeuntil_inclusive(predicate, iterable):
         yield x
         if predicate(x):
             return
+
+
+def init():
+    # Set cwd to data directory.
+    os.chdir(os.path.join(os.path.dirname(__file__), sys.argv[1]))
+
+    # Set up logging.
+    formatter = logging.Formatter("%(asctime)s %(name)s %(levelname)s %(message)s")
+    log.setLevel(logging.DEBUG)
+    for level in (logging.DEBUG, logging.ERROR):
+        handler = logging.FileHandler(logging.getLevelName(level) + ".log")
+        handler.setFormatter(formatter)
+        handler.setLevel(level)
+        log.addHandler(handler)
+    log.info("Ergometer starting")

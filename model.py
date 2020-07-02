@@ -1,8 +1,13 @@
+import sys
+
 from collections import deque
+import logging
 from threading import Event, Thread
 
 from .data_processor import run_loop
 from .database import connect
+
+from .util import log
 
 
 class Model:
@@ -11,10 +16,13 @@ class Model:
         self._local_events = deque()
         self.Session = connect("sqlite:///data.sqlite")
         self._cache = {}
+        self.storage_root = "."
+        self.cloud_broker_address = sys.argv[2]
         self._thread = Thread(target=run_loop, args=(self,))
         self._thread.start()
 
     def push_local_event(self, event):
+        log.debug(f"Got local event: {event}")
         self._local_events.append(event)
 
     def pop_local_event(self):
