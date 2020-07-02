@@ -35,6 +35,7 @@ class Tray(wx.adv.TaskBarIcon):
         g = randint(0, 255)
         b = randint(0, 255)
         self.SetIcon(create_icon(Color(r, g, b)), "FIXME 2")
+        frame.SetTransparent(randint(0, 254))
 
 
 def exit(*args):

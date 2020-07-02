@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from .activity_test_util import add_activity
-from .cache_updater import ActivityEdge, connect
+from .database import ActivityEdge, connect
 from .time import in_seconds
 
 

@@ -1,6 +1,5 @@
 import struct
 from bisect import bisect_left, bisect_right
-from contextlib import contextmanager
 from enum import Enum
 from functools import total_ordering
 from itertools import chain, dropwhile, islice, repeat
@@ -10,7 +9,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
 from .broker import subscribe
-from .time import day_start_of, imprecise_clock, in_seconds, is_on_day, max_time
+from .time import day_start_of, in_seconds, is_on_day, max_time
 from .util import (
     Interval,
     PositionError,
@@ -20,32 +19,32 @@ from .util import (
     takeuntil_inclusive,
 )
 
-Session = sessionmaker()
 
+class connect(sessionmaker):
+    def __init__(self, db_address):
+        self.__engine = create_engine(db_address)
 
-@contextmanager
-def connect(db_address):
-    engine = create_engine(db_address)
-
-    try:
         # Override pysqlite's broken transaction handling
         # https://docs.sqlalchemy.org/en/13/dialects/sqlite.html#pysqlite-serializable
-        @event.listens_for(engine, "connect")
+        @event.listens_for(self.__engine, "connect")
         def do_connect(dbapi_connection, connection_record):
             dbapi_connection.isolation_level = None
 
-        @event.listens_for(engine, "begin")
+        @event.listens_for(self.__engine, "begin")
         def do_begin(connection):
             connection.execute("BEGIN")
 
-        Base.metadata.create_all(engine)
-        Session.configure(bind=engine)
-        yield Session
+        Base.metadata.create_all(self.__engine)
+        self.configure(bind=self.__engine)
 
-    finally:
-        engine.dispose()
+    def __enter__(self):
+        return self
+
+    def __exit__(self):
+        self.__engine.dispose()
 
 
+Session = connect()
 Base = declarative_base()
 
 
@@ -58,7 +57,7 @@ class HostPosition(Base):
         return f"{self.host}:{self.position}"
 
     @staticmethod
-    def update(session, host, data, position):
+    def update(session, host, position, data):
         host_position = session.query(HostPosition).get(host)
         if not host_position:
             host_position = HostPosition(host=host, position=0)
@@ -273,16 +272,14 @@ setting_types = [t for t in EventType.__members__.values() if t.is_setting]
 
 data_format = "<BxxxIQ"
 
-
 @retry_on(PositionError)
-async def cache_updater(cache, file_manager):
-    with connect("sqlite:///cache.db") as Session:
-        host_positions = init_cache(cache, imprecise_clock(), Session())
-        async for args in subscribe(file_manager, host_positions):
-            update_cache(cache, imprecise_clock(), Session(), *args)
+async def database_updater(Session, update_cache, subscribe):
+    cache, host_positions = init(update_cache, imprecise_clock(), Session())
+    async for args in subscribe(host_positions):
+        cache = update_database(cache, update_cache, imprecise_clock(), Session(), *args)
 
 
-def init_cache(cache, now, session):
+def init(update_cache, now, session):
     today_start = day_start_of(now)
     today_end = today_start + in_seconds(days=1)
     delta = {
@@ -296,11 +293,10 @@ def init_cache(cache, now, session):
         delta[setting.name] = setting.value
     host_positions = {hp.host: hp.position for hp in session.query(HostPosition)}
     session.commit()
-    cache.update(delta)
-    return host_positions
+    return update_cache(delta), host_positions
 
 
-def update_cache(cache, now, session, host, position, data):
+def update_database(cache, update_cache, now, session, host, position, data):
     HostPosition.update(session, host, data, position)
 
     today_start = day_start_of(now)
@@ -310,15 +306,15 @@ def update_cache(cache, now, session, host, position, data):
         day_start = today_start
         daily_total = None
     activity_updater = ActivityUpdater(session)
-    min_activity_start = None
-    max_activity_end = None
+    min_activity_start = max_time
+    max_activity_end = 0
 
     for event_type_id, value, time in struct.iter_unpack(data_format, data):
         event_type = EventType(event_type_id)
         if event_type == EventType.action:
-            if min_activity_start is None or time < min_activity_start:
+            if time < min_activity_start:
                 min_activity_start = time
-            if max_activity_end is None or time + value > max_activity_end:
+            if time + value > max_activity_end:
                 max_activity_end = time + value
             activity_increase = activity_updater.update(time, value)
             if daily_total is not None and is_on_day(time, day_start):
@@ -348,37 +344,13 @@ def update_cache(cache, now, session, host, position, data):
     rest_target = delta.get("rest_target") or cache["rest_target"]
     if (
         rest_target_changed
-        or min_activity_start is not None
-        and max_activity_end is not None
-        and Interval(min_activity_start, max_activity_end).overlaps(
+        or Interval(min_activity_start, max_activity_end).overlaps(
             session_start - rest_target, session_start
         )
-        or max_activity_end is not None
-        and max_activity_end >= rest_start + rest_target
+        or max_activity_end >= rest_start + rest_target
     ):
         delta["session_start"] = ActivityEdge.session_start(session)
-    if max_activity_end is not None and max_activity_end > rest_start:
+    if max_activity_end > rest_start:
         delta["rest_start"] = max_activity_end
     session.commit()
-    cache.update(delta)
-
-
-def metrics_at(
-    now,
-    daily_target,
-    session_target,
-    rest_target,
-    day_start,
-    daily_total,
-    session_start,
-    rest_start,
-):
-    rest_value = now - rest_start
-    return dict(
-        daily_target=daily_target,
-        session_target=session_target,
-        rest_target=rest_target,
-        daily_value=daily_total if is_on_day(now, day_start) else 0,
-        session_value=now - session_start if rest_value < rest_target else 0,
-        rest_value=rest_value,
-    )
+    return update_cache(delta)

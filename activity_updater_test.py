@@ -1,4 +1,4 @@
-from .cache_updater import connect, ActivityUpdater
+from .database import connect, ActivityUpdater
 from .activity_test_util import add_activity, assert_activity
 
 

@@ -1,4 +1,4 @@
-from .cache_updater import min_pause, ActivityEdge
+from .database import min_pause, ActivityEdge
 from .time import max_time
 
 

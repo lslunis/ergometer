@@ -1,7 +1,7 @@
 from datetime import datetime
 import struct
 
-from .cache_updater import connect, data_format, EventType, HostPosition
+from .database import connect, data_format, EventType, HostPosition
 from .util import PositionError
 
 now = datetime(year=2020, month=5, day=16)

@@ -28,17 +28,17 @@ async def publish_local_events(host, broker, file_manager):
         position = await broker.write(host, data, position)
 
 
-# Read local events from "event_queue" in groups of "batch_size"
-# and write them using "file_manager".
-@retry_on(Exception)
-async def local_event_handler(host, event_queue, file_manager, batch_size):
-    to_write = [await event_queue.get()]
-    for _ in range(batch_size - 1):
-        if event_queue.empty():
-            break
-        # Make this a list
-        to_write.append(event_queue.get_nowait())
-    file_manager.write(host, to_write)
+async def local_event_handler(host, pop_local_event, file_manager, batch_size):
+    while True:
+        events = []
+        try:
+            while True:
+                events.append(pop_local_event())
+        except IndexError:
+            ...
+        if events:
+            file_manager.write(host, events)
+        await asyncio.sleep(0.01)
 
 
 # Read all changes from "broker" for other hosts and write them using
@@ -191,6 +191,50 @@ class FileManager:
             self.add_file(host, self.host_path(host))
         return await self.hosts[host].read(position, batch_size)
 
+    async def subscribe(self, client_positions, exclude=None):
+        while True:
+            pending = set(
+                [
+                    read_with_host(self, host, pos, BATCH_SIZE)
+                    for host, pos in merge_positions(
+                        client_positions, self.positions
+                    ).items()
+                    if host != exclude
+                ]
+            )
+            pending.add(self.new_file.wait())
+            while True:
+                done, pending = await asyncio.wait(
+                    pending, return_when=asyncio.FIRST_COMPLETED
+                )
+                do_break = False
+                for task in done:
+                    value = await task
+
+                    # The completed task is waiting on a new file. When we've
+                    # sent all of the data from this iteratio we should
+                    # get a new set of positions.
+                    if value is True:
+                        do_break = True
+                        continue
+
+                    # The completed task is a read. Update client_positions,
+                    # send the data back, and enqueue the next read from that
+                    # file.
+                    host_completed, pos, data = await task
+                    pending.add(
+                        read_with_host(
+                            self, host_completed, pos + len(data), BATCH_SIZE
+                        )
+                    )
+                    client_positions[host_completed] = pos + len(data)
+                    yield host_completed, pos, data
+
+                # If there's a new file reset everything. Otherwise keep
+                # awaitng the next task.
+                if do_break:
+                    break
+
 
 class BrokerClient:
     def __init__(self, address):
@@ -234,15 +278,32 @@ def get_current_host(storage_root):
     return host
 
 
-async def run_subprocess(queue, command, args):
+async def run_subprocess(push_local_event, command, args):
     subprocess = await asyncio.create_subprocess_exec(
         command, *args, stdout=asyncio.subprocess.PIPE
     )
     while True:
-        data = await subprocess.stdout.read(16)
-        die_unless(
-            len(data) == 16,
-            f"Did not get 16 bytes from subprocess {command}. Got: '{data}'",
-        )
-        await asyncio.sleep(0.5)
-        await queue.put(data)
+        push_local_event(await subprocess.stdout.readexactly(16))
+
+
+async def exit_watcher(is_exiting):
+    while True:
+        if is_exiting():
+            raise SystemExit
+        await asyncio.sleep(0.01)
+
+
+BATCH_SIZE = 100
+
+
+def merge_positions(client, server):
+    positions = {k: v for k, v in client.items()}
+    for k, v in server.items():
+        if k not in positions:
+            positions[k] = 0
+    return positions
+
+
+async def read_with_host(file_manager, host, position, batch_size):
+    data = await file_manager.read(host, position, batch_size)
+    return (host, position, data)

@@ -1,4 +1,4 @@
-from .cache_updater import connect, ActivityEdge
+from .database import connect, ActivityEdge
 from .activity_test_util import add_activity
 
 
