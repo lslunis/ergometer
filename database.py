@@ -8,7 +8,6 @@ from sqlalchemy import Boolean, Column, Integer, String, create_engine, event, f
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-from .broker import subscribe
 from .time import day_start_of, in_seconds, is_on_day, max_time
 from .util import (
     Interval,
@@ -22,6 +21,7 @@ from .util import (
 
 class connect(sessionmaker):
     def __init__(self, db_address):
+        super().__init__()
         self.__engine = create_engine(db_address)
 
         # Override pysqlite's broken transaction handling
@@ -40,11 +40,10 @@ class connect(sessionmaker):
     def __enter__(self):
         return self
 
-    def __exit__(self):
+    def __exit__(self, *args):
         self.__engine.dispose()
 
 
-Session = connect()
 Base = declarative_base()
 
 
@@ -57,7 +56,7 @@ class HostPosition(Base):
         return f"{self.host}:{self.position}"
 
     @staticmethod
-    def update(session, host, position, data):
+    def update(session, host, data, position):
         host_position = session.query(HostPosition).get(host)
         if not host_position:
             host_position = HostPosition(host=host, position=0)
@@ -149,7 +148,7 @@ def get_overlapping_intervals(edges, start, end, as_pauses=False):
 
 @event.listens_for(ActivityEdge.__table__, "after_create")
 def do_after_create(target, connection, **kwds):
-    session = Session(bind=connection)
+    session = sessionmaker()(bind=connection)
     session.add(ActivityEdge(time=0, rising=False))
     session.add(ActivityEdge(time=max_time, rising=True))
     session.commit()
@@ -272,11 +271,14 @@ setting_types = [t for t in EventType.__members__.values() if t.is_setting]
 
 data_format = "<BxxxIQ"
 
+
 @retry_on(PositionError)
 async def database_updater(Session, update_cache, subscribe):
     cache, host_positions = init(update_cache, imprecise_clock(), Session())
     async for args in subscribe(host_positions):
-        cache = update_database(cache, update_cache, imprecise_clock(), Session(), *args)
+        cache = update_database(
+            cache, update_cache, imprecise_clock(), Session(), *args
+        )
 
 
 def init(update_cache, now, session):

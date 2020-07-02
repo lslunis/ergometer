@@ -1,7 +1,7 @@
 from collections import deque
 from threading import Event, Thread
 
-from .data_worker import run_loop
+from .data_processor import run_loop
 from .database import connect
 
 

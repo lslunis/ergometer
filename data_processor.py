@@ -4,10 +4,12 @@ import glob
 import os
 import os.path as path
 import uuid
+import sys
 
 import websockets
 
 from . import messages as m
+from .database import database_updater
 from .util import FatalError, die_unless, retry_on, retry_on_iter
 
 
@@ -28,7 +30,7 @@ async def publish_local_events(host, broker, file_manager):
         position = await broker.write(host, data, position)
 
 
-async def local_event_handler(host, pop_local_event, file_manager, batch_size):
+async def local_event_handler(host, pop_local_event, file_manager):
     while True:
         events = []
         try:
@@ -307,3 +309,30 @@ def merge_positions(client, server):
 async def read_with_host(file_manager, host, position, batch_size):
     data = await file_manager.read(host, position, batch_size)
     return (host, position, data)
+
+
+async def data_worker(model):
+    storage_root = sys.argv[1]
+    cloud_broker_address = sys.argv[2]
+
+    error_event = asyncio.Event()
+    host = get_current_host(storage_root)
+    die_unless(len(host) > 0, "host is empty")
+    file_manager = FileManager(host, storage_root, error_event)
+    broker = BrokerClient(cloud_broker_address)
+
+    try:
+        await asyncio.gather(
+            change_subscriber(host, broker, file_manager),
+            publish_local_events(host, broker, file_manager),
+            run_subprocess(model.push_local_event, "yes", ["0123456789ABCDEF"]),
+            local_event_handler(host, model.pop_local_event, file_manager),
+            database_updater(model.Session, model.update_cache, file_manager.subscribe),
+            exit_watcher(model.is_exiting),
+        )
+    except SystemExit:
+        return
+
+
+def run_loop(model):
+    asyncio.run(data_worker(model))
