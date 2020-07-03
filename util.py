@@ -5,7 +5,6 @@ import sys
 from collections import namedtuple
 from functools import wraps
 from itertools import takewhile
-from warnings import warn
 
 log = logging.getLogger("ergometer")
 
@@ -29,12 +28,27 @@ class Interval(namedtuple("Interval", ["start", "end"])):
         return self.start < other.start < self.end or self.start < other.end < self.end
 
 
+def init():
+    storage_root = os.path.join(os.path.dirname(__file__), sys.argv[1])
+    os.makedirs(storage_root, exist_ok=True)
+    os.chdir(storage_root)
+
+    formatter = logging.Formatter("%(asctime)s %(name)s %(levelname)s %(message)s")
+    log.setLevel(logging.DEBUG)
+    for level in (logging.DEBUG, logging.ERROR):
+        handler = logging.FileHandler(logging.getLevelName(level) + ".log")
+        handler.setFormatter(formatter)
+        handler.setLevel(level)
+        log.addHandler(handler)
+    log.info("Ergometer starting")
+
+
 def pairwise(iterable):
     iterator = iter(iterable)
     return zip(iterator, iterator)
 
 
-def retry_on(Error, return_on_success=False, retry_delay=None):
+def retry_on(Error, return_on_success=False, retry_delay=5):
     def curry(loop):
         @wraps(loop)
         async def retry_loop(*args, **kwargs):
@@ -55,7 +69,7 @@ def retry_on(Error, return_on_success=False, retry_delay=None):
     return curry
 
 
-def retry_on_iter(Error, retry_delay=None):
+def retry_on_iter(Error, retry_delay=5):
     def curry(loop):
         @wraps(loop)
         async def retry_loop(*args, **kwargs):
@@ -80,18 +94,3 @@ def takeuntil_inclusive(predicate, iterable):
         yield x
         if predicate(x):
             return
-
-
-def init():
-    # Set cwd to data directory.
-    os.chdir(os.path.join(os.path.dirname(__file__), sys.argv[1]))
-
-    # Set up logging.
-    formatter = logging.Formatter("%(asctime)s %(name)s %(levelname)s %(message)s")
-    log.setLevel(logging.DEBUG)
-    for level in (logging.DEBUG, logging.ERROR):
-        handler = logging.FileHandler(logging.getLevelName(level) + ".log")
-        handler.setFormatter(formatter)
-        handler.setLevel(level)
-        log.addHandler(handler)
-    log.info("Ergometer starting")

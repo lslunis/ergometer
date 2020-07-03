@@ -2,6 +2,8 @@ import base64
 import copy
 import json
 
+from .util import log
+
 TYPE_MAP = {}
 
 
@@ -36,15 +38,19 @@ class Message(metaclass=Registrar):
         return self.TYPE
 
     def encode(self):
+        log.debug("encoding")
         encoded = copy.copy(self.fields)
         encoded["type"] = self.TYPE
         encoded["error"] = self.error
         if "data" in encoded:
             encoded["data"] = base64.b64encode(encoded["data"]).decode("ascii")
-        return json.dumps(encoded)
+        data = json.dumps(encoded)
+        log.debug(f"encoded {len(data)}")
+        return data
 
     @classmethod
     def decode(cls, blob):
+        log.debug(f"decoding {len(blob)}")
         msg = json.loads(blob)
         msg_type = msg["type"]
         if "data" in msg:
@@ -55,7 +61,9 @@ class Message(metaclass=Registrar):
         del msg["type"]
         error = msg["error"]
         del msg["error"]
-        return TYPE_MAP[msg_type](error, **msg)
+        instance = TYPE_MAP[msg_type](error, **msg)
+        log.debug("decoded")
+        return instance
 
 
 class WriteRequest(Message):

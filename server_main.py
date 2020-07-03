@@ -4,9 +4,10 @@ import sys
 
 import websockets
 
-from .data_processor import FileManager
 from . import messages as m
-from .util import init, FatalError
+from .data_processor import FileManager
+from .util import FatalError, init, log
+
 
 # Handles "read" calls. Sends an unending stream of data to a client.
 async def send_updates(file_manager, websocket, client_positions, exclude=None):
@@ -20,6 +21,7 @@ def client_handler(file_manager):
         try:
             async for message in websocket:
                 msg = m.Message.decode(message)
+                log.debug(f"processing message {msg.type}")
                 if msg.type == m.ReadRequest.TYPE:
                     asyncio.create_task(
                         send_updates(
@@ -38,7 +40,7 @@ def client_handler(file_manager):
                 else:
                     raise FatalError("Unknown action type in message: {message}")
         except websockets.exceptions.ConnectionClosedError:
-            pass
+            log.debug("connection closed")
 
     return handle_client
 
@@ -47,8 +49,12 @@ async def main():
     init()
     port = sys.argv[2]
     file_manager = FileManager("broker", ".", asyncio.Event())
-    await websockets.serve(client_handler(file_manager), "localhost", port)
+    """
+    import ssl
+    ssl=ssl.SSLContext()
+    """
+    server = await websockets.serve(client_handler(file_manager), "localhost", port)
+    await server.wait_closed()
 
 
-asyncio.get_event_loop().run_until_complete(main())
-asyncio.get_event_loop().run_forever()
+asyncio.run(main())

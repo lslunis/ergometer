@@ -1,14 +1,24 @@
-import logging
 import os
-from random import randint
 import sys
+from random import randint
 
 import wx
 import wx.adv
+
 from .model import Model
-from .util import init
+from .util import init, log
 
 Color = wx.Colour
+
+
+"""
+error:red, rest:orange, session:indigo, daily:teal
+
+const red = '#fc003c' // 5.0R-5-20
+const orange = '#e53800' // 10.0R-5-18
+const teal = '#009d89' // 2.5BG-5-24
+const indigo = '#486aff' // 7.5PB-5-20
+"""
 
 
 def create_icon(fill_color):
@@ -31,7 +41,7 @@ class Tray(wx.adv.TaskBarIcon):
     def CreatePopupMenu(self):
         menu = wx.Menu()
         item = wx.MenuItem(menu, wx.ID_ANY, "Exit")
-        menu.Bind(wx.EVT_MENU, exit, id=item.GetId())
+        menu.Bind(wx.EVT_MENU, lambda *args: top.Close(), id=item.GetId())
         menu.Append(item)
         return menu
 
@@ -40,7 +50,7 @@ class Tray(wx.adv.TaskBarIcon):
         g = randint(0, 255)
         b = randint(0, 255)
         self.SetIcon(create_icon(Color(r, g, b)), "FIXME 2")
-        frame.SetTransparent(randint(0, 254))
+        top.SetTransparent(randint(0, 254))
 
 
 def exit(*args):
@@ -48,23 +58,23 @@ def exit(*args):
     model.exit()
     tray.RemoveIcon()
     tray.Destroy()
-    frame.Destroy()
+    top.Destroy()
     log.info("Ergometer exited")
 
 
 if __name__ == "__main__":
     init()
     app = wx.App()
-    frame = wx.Frame(
+    top = wx.Frame(
         None,
         style=wx.TRANSPARENT_WINDOW
         | wx.STAY_ON_TOP
         | wx.FRAME_TOOL_WINDOW
         | wx.MAXIMIZE,
     )
-    frame.SetTransparent(128)
-    frame.Show()
+    top.SetTransparent(0)
+    top.Show()
     tray = Tray()
-    frame.Bind(wx.EVT_CLOSE, exit)
     model = Model()
+    top.Bind(wx.EVT_CLOSE, exit)
     app.MainLoop()

@@ -1,4 +1,4 @@
-from .database import min_pause, ActivityEdge
+from .database import ActivityEdge, min_pause
 from .time import max_time
 
 

@@ -1,16 +1,16 @@
 import asyncio
 import asyncio.subprocess
 import glob
-import logging
 import os
 import os.path as path
-import uuid
 import struct
 import sys
+import uuid
+
 import websockets
 
 from . import messages as m
-from .database import database_updater, data_format, EventType
+from .database import EventType, data_format, database_updater
 from .time import imprecise_clock
 from .util import FatalError, die_unless, log, retry_on, retry_on_iter
 
@@ -23,8 +23,8 @@ class IntegrityError(Exception):
 
 
 # Read local events for "host", writing them to "broker".
-async def publish_local_events(host, broker, file_manager):
-    log.info("Starting publish_local_events")
+async def local_event_publisher(host, broker, file_manager):
+    log.debug("Starting local_event_publisher")
     position = await broker.host_position(host)
     while True:
         data = await file_manager.read(host, position, 100)
@@ -32,8 +32,8 @@ async def publish_local_events(host, broker, file_manager):
         position = await broker.write(host, data, position)
 
 
-async def local_event_handler(host, pop_local_event, file_manager):
-    log.info("Starting local_event_handler")
+async def local_event_writer(host, pop_local_event, file_manager):
+    log.debug("Starting local_event_writer")
     while True:
         events = []
         try:
@@ -50,7 +50,7 @@ async def local_event_handler(host, pop_local_event, file_manager):
 # "file_manager".
 @retry_on(Exception)
 async def change_subscriber(self_host, broker, file_manager):
-    log.info("Starting change_subscriber")
+    log.debug("Starting change_subscriber")
     # Initialize.
     positions = file_manager.positions
 
@@ -62,10 +62,9 @@ async def change_subscriber(self_host, broker, file_manager):
 # A single file. Does error handling around reads and writes as well as
 # tracking the position. Writes are synchronous and reads are asynchronous.
 class HostFile:
-    def __init__(self, host_path, error_event):
+    def __init__(self, host_path):
         self.path = host_path
         self.data_available = asyncio.Event()
-        self.error_event = error_event
         if not path.exists(host_path):
             with open(host_path, "w"):
                 pass
@@ -82,7 +81,7 @@ class HostFile:
             file_position -= file_position % 16
             f.seek(file_position)
             corruption = f.read(16)
-            self.log(f"Corruption in file {self.path}: '{corruption}'")
+            log.error(f"Corruption in file {self.path}: '{corruption}'")
         f.seek(file_position)
         return file_position
 
@@ -103,7 +102,9 @@ class HostFile:
                 raise IntegrityError(
                     f"Tried to write {to_write_len} bytes to {self.path}, which is not divisible by 16"
                 )
+            log.debug("writing")
             bytes_written = f.write(to_write)
+            log.debug(f"wrote {bytes_written}")
             die_unless(
                 bytes_written == len(to_write), f"Failed to write to file {self.path}"
             )
@@ -138,16 +139,17 @@ class HostFile:
             f.seek(position)
             desired_bytes = batch_size * 16
             available_bytes = file_size - position
+            log.debug("reading")
             data = f.read(min(desired_bytes, available_bytes))
+            log.debug(f"read {len(data)}")
         return data
 
 
 # Reads and writes data for particular hosts.
 class FileManager:
-    def __init__(self, host, storage_root, error_event):
+    def __init__(self, host, storage_root):
         self.storage_root = storage_root
         self.host = host
-        self.error_event = error_event
         self.hosts = {}
         self.new_file = asyncio.Event()
         for host_path in glob.glob(self.host_path("*")):
@@ -155,24 +157,12 @@ class FileManager:
             self.add_file(host, host_path)
 
     def add_file(self, host, host_path):
-        self.hosts[host] = HostFile(host_path, self.error_event)
+        self.hosts[host] = HostFile(host_path)
         self.new_file.set()
         self.new_file = asyncio.Event()
 
     def host_path(self, host):
         return os.path.join(self.storage_root, f"{host}.hostlog")
-
-    # Log an error message. A newline is automatically appended.
-    def log(self, msg):
-        error_path = os.path.join(self.storage_root, "file-manager-error.log")
-        with open(error_path, "a") as f:
-            full_message = msg + "\n"
-            bytes_written = f.write(full_message)
-            die_unless(
-                bytes_written == len(full_message),
-                f"Failed to write to error log {error_path}",
-            )
-        self.error_event.set()
 
     @property
     def positions(self):
@@ -278,23 +268,6 @@ def get_current_host(storage_root):
     return host
 
 
-async def run_subprocess(push_local_event, command, args):
-    log.info("Starting run_subprocess")
-    subprocess = await asyncio.create_subprocess_exec(
-        command, *args, stdout=asyncio.subprocess.PIPE
-    )
-    while True:
-        push_local_event(await subprocess.stdout.readexactly(16))
-
-
-async def exit_watcher(is_exiting):
-    log.info("Starting exit_watcher")
-    while True:
-        if is_exiting():
-            raise SystemExit
-        await asyncio.sleep(0.01)
-
-
 BATCH_SIZE = 100
 
 
@@ -312,38 +285,58 @@ async def read_with_host(file_manager, host, position, batch_size):
 
 
 async def activity_monitor(push_local_event):
-    log.info("Starting activity_monitor")
+    log.debug("Starting activity_monitor")
     if os.name == "nt":
-        return await run_subprocess(model.push_local_event, "yes", ["0123456789ABCDEF"])
+        return await run_subprocess(push_local_event, "../activity_monitor.exe", [])
 
     # Non-windows.
     while True:
-        event = struct.pack(
-            data_format, EventType.action.value, 1, int(imprecise_clock().timestamp())
-        )
-        push_local_event(event)
+        push_local_event(make_event(int(imprecise_clock().timestamp())))
         await asyncio.sleep(1)
 
 
+async def run_subprocess(push_local_event, command, args):
+    log.debug("Starting run_subprocess")
+    subprocess = await asyncio.create_subprocess_exec(
+        command, *args, stdout=asyncio.subprocess.PIPE
+    )
+    try:
+        while True:
+            time = await subprocess.stdout.readuntil()
+            push_local_event(make_event(time))
+    except asyncio.CancelledError:
+        ...
+    finally:
+        subprocess.terminate()
+        await subprocess.wait()
+
+
+def make_event(time):
+    return struct.pack(
+            data_format, EventType.action.value, 1, time)
+        )
+
 async def data_worker(model):
-    log.info("Starting data worker")
-    error_event = asyncio.Event()
+    log.debug("Starting data_worker")
     host = get_current_host(model.storage_root)
     die_unless(len(host) > 0, "host is empty")
-    file_manager = FileManager(host, model.storage_root, error_event)
+    file_manager = FileManager(host, model.storage_root)
     broker = BrokerClient(model.cloud_broker_address)
 
-    try:
-        await asyncio.gather(
-            change_subscriber(host, broker, file_manager),
-            publish_local_events(host, broker, file_manager),
-            activity_monitor(model.push_local_event),
-            local_event_handler(host, model.pop_local_event, file_manager),
-            database_updater(model.Session, model.update_cache, file_manager.subscribe),
-            exit_watcher(model.is_exiting),
-        )
-    except SystemExit:
-        return
+    worker = await asyncio.gather(
+        change_subscriber(host, broker, file_manager),
+        local_event_publisher(host, broker, file_manager),
+        activity_monitor(model.push_local_event),
+        local_event_writer(host, model.pop_local_event, file_manager),
+        database_updater(model.Session, model.update_cache, file_manager.subscribe),
+    )
+
+    while True:
+        if model.exiting:
+            worker.cancel()
+            await worker
+            break
+        await asyncio.sleep(0.01)
 
 
 def run_loop(model):

@@ -1,24 +1,18 @@
 import struct
 from bisect import bisect_left, bisect_right
 from enum import Enum
-import logging
 from functools import total_ordering
 from itertools import chain, dropwhile, islice, repeat
 
-from sqlalchemy import Boolean, Column, Integer, String, create_engine, event, func
+from sqlalchemy import (Boolean, Column, Integer, String, create_engine, event,
+                        func)
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-from .time import day_start_of, in_seconds, is_on_day, max_time, imprecise_clock
-from .util import (
-    Interval,
-    PositionError,
-    die_unless,
-    pairwise,
-    log,
-    retry_on,
-    takeuntil_inclusive,
-)
+from .time import (day_start_of, imprecise_clock, in_seconds, is_on_day,
+                   max_time)
+from .util import (Interval, PositionError, die_unless, log, pairwise,
+                   retry_on, takeuntil_inclusive)
 
 
 class connect(sessionmaker):
@@ -28,6 +22,7 @@ class connect(sessionmaker):
 
         # Override pysqlite's broken transaction handling
         # https://docs.sqlalchemy.org/en/13/dialects/sqlite.html#pysqlite-serializable
+
         @event.listens_for(self.__engine, "connect")
         def do_connect(dbapi_connection, connection_record):
             dbapi_connection.isolation_level = None
@@ -276,12 +271,15 @@ data_format = "<BxxxIQ"
 
 @retry_on(PositionError)
 async def database_updater(Session, update_cache, subscribe):
-    log.info("Starting database_updater")
+    log.debug("Starting database_updater")
     cache, host_positions = init(update_cache, imprecise_clock(), Session())
+    log.debug("database_updater initialized")
     async for args in subscribe(host_positions):
+        log.debug("updating database")
         cache = update_database(
             cache, update_cache, imprecise_clock(), Session(), *args
         )
+        log.debug("database updated")
 
 
 def init(update_cache, now, session):
@@ -330,7 +328,7 @@ def update_database(cache, update_cache, now, session, host, position, data):
         elif event_type.is_setting:
             event_type.get(session).update_if_newer(value, time)
         else:
-            ...  # TODO warn
+            log.error(f"Unhandled: {event_type}")
 
     delta = {}
     rest_target_changed = False

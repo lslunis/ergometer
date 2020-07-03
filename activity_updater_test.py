@@ -1,5 +1,5 @@
-from .database import connect, ActivityUpdater
 from .activity_test_util import add_activity, assert_activity
+from .database import ActivityUpdater, connect
 
 
 def test_split_empty():

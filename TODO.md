@@ -1,5 +1,0 @@
-- https://matplotlib.org/index.html
-- https://matplotlib.org/3.2.1/gallery/user_interfaces/mpl_with_glade3_sgskip.html#sphx-glr-gallery-user-interfaces-mpl-with-glade3-sgskip-py
-- https://github.com/lslunis/ergometer/blob/f14d7886cb104cb1a8a1ff58ec72eeb7c996f18d/colors.js
-  - error:red, rest:orange, session:indigo, daily:teal
-- https://docs.python-guide.org/shipping/freezing/

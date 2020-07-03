@@ -1,1 +1,0 @@
-python dev.py t %*
