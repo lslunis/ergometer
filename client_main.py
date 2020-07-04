@@ -65,13 +65,8 @@ def exit(*args):
 if __name__ == "__main__":
     init()
     app = wx.App()
-    top = wx.Frame(
-        None,
-        style=wx.TRANSPARENT_WINDOW
-        | wx.STAY_ON_TOP
-        | wx.FRAME_TOOL_WINDOW
-        | wx.MAXIMIZE,
-    )
+    style = wx.TRANSPARENT_WINDOW | wx.STAY_ON_TOP | wx.FRAME_TOOL_WINDOW | wx.MAXIMIZE
+    top = wx.Frame(None, style=style) if os.name == "nt" else wx.Frame(None)
     top.SetTransparent(0)
     top.Show()
     tray = Tray()
