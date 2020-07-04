@@ -6,6 +6,7 @@ from threading import Event, Thread
 
 from .data_processor import run_loop
 from .database import EventType, connect, data_format
+from .time import is_on_day
 from .util import log
 
 
@@ -35,14 +36,14 @@ class Model:
         self._cache = {**self._cache, **delta}
         return self._cache
 
-    def metrics_at(self, now):
+    def metrics_at(self, time):
         if not self._cache:
             return None
         m = {**self._cache}
-        m["daily_value"] = m["daily_total"] if is_on_day(now, m["day_start"]) else 0
-        m["rest_value"] = now - m["rest_start"]
+        m["daily_value"] = m["daily_total"] if is_on_day(time, m["day_start"]) else 0
+        m["rest_value"] = time - m["rest_start"]
         m["session_value"] = (
-            now - m["session_start"] if m["rest_value"] < m["rest_target"] else 0
+            time - m["session_start"] if m["rest_value"] < m["rest_target"] else 0
         )
         return m
 
