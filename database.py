@@ -4,15 +4,20 @@ from enum import Enum
 from functools import total_ordering
 from itertools import chain, dropwhile, islice, repeat
 
-from sqlalchemy import (Boolean, Column, Integer, String, create_engine, event,
-                        func)
+from sqlalchemy import Boolean, Column, Integer, String, create_engine, event, func
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-from .time import (day_start_of, imprecise_clock, in_seconds, is_on_day,
-                   max_time)
-from .util import (Interval, PositionError, die_unless, log, pairwise,
-                   retry_on, takeuntil_inclusive)
+from .time import day_start_of, imprecise_clock, in_seconds, is_on_day, max_time
+from .util import (
+    Interval,
+    PositionError,
+    die_unless,
+    log,
+    pairwise,
+    retry_on,
+    takeuntil_inclusive,
+)
 
 
 class connect(sessionmaker):

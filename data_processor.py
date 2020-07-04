@@ -300,21 +300,24 @@ async def run_subprocess(push_local_event, command, args):
     subprocess = await asyncio.create_subprocess_exec(
         command, *args, stdout=asyncio.subprocess.PIPE
     )
+    out = subprocess.stdout
     try:
         while True:
-            time = await subprocess.stdout.readuntil()
+            time = int(await out.readuntil())
             push_local_event(make_event(time))
     except asyncio.CancelledError:
         ...
     finally:
+        log.debug('closing subprocess')
+        out.close()
         subprocess.terminate()
-        await subprocess.wait()
+        await asyncio.gather(out.wait_closed(), subprocess.wait())
+        log.debug('closed subprocess')
 
 
 def make_event(time):
-    return struct.pack(
-            data_format, EventType.action.value, 1, time)
-        )
+    return struct.pack(data_format, EventType.action.value, 1, time)
+
 
 async def data_worker(model):
     log.debug("Starting data_worker")
@@ -323,7 +326,7 @@ async def data_worker(model):
     file_manager = FileManager(host, model.storage_root)
     broker = BrokerClient(model.cloud_broker_address)
 
-    worker = await asyncio.gather(
+    tasks = asyncio.gather(
         change_subscriber(host, broker, file_manager),
         local_event_publisher(host, broker, file_manager),
         activity_monitor(model.push_local_event),
@@ -331,12 +334,12 @@ async def data_worker(model):
         database_updater(model.Session, model.update_cache, file_manager.subscribe),
     )
 
-    while True:
-        if model.exiting:
-            worker.cancel()
-            await worker
-            break
+    while not model.exiting:
         await asyncio.sleep(0.01)
+    log.debug("canceling data tasks")
+    tasks.cancel()
+    await tasks
+    log.debug("canceled data tasks")
 
 
 def run_loop(model):
