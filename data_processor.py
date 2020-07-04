@@ -48,7 +48,6 @@ async def local_event_writer(host, pop_local_event, file_manager):
 
 # Read all changes from "broker" for other hosts and write them using
 # "file_manager".
-@retry_on(Exception)
 async def change_subscriber(self_host, broker, file_manager):
     log.debug("Starting change_subscriber")
     # Initialize.
@@ -308,11 +307,11 @@ async def run_subprocess(push_local_event, command, args):
     except asyncio.CancelledError:
         ...
     finally:
-        log.debug('closing subprocess')
+        log.debug("closing subprocess")
         out.close()
         subprocess.terminate()
         await asyncio.gather(out.wait_closed(), subprocess.wait())
-        log.debug('closed subprocess')
+        log.debug("closed subprocess")
 
 
 def make_event(time):
@@ -326,19 +325,23 @@ async def data_worker(model):
     file_manager = FileManager(host, model.storage_root)
     broker = BrokerClient(model.cloud_broker_address)
 
-    tasks = asyncio.gather(
-        change_subscriber(host, broker, file_manager),
-        local_event_publisher(host, broker, file_manager),
-        activity_monitor(model.push_local_event),
-        local_event_writer(host, model.pop_local_event, file_manager),
-        database_updater(model.Session, model.update_cache, file_manager.subscribe),
-    )
+    tasks = [
+        asyncio.create_task(coro)
+        for coro in [
+            change_subscriber(host, broker, file_manager),
+            local_event_publisher(host, broker, file_manager),
+            activity_monitor(model.push_local_event),
+            local_event_writer(host, model.pop_local_event, file_manager),
+            database_updater(model.Session, model.update_cache, file_manager.subscribe),
+        ]
+    ]
 
     while not model.exiting:
         await asyncio.sleep(0.01)
     log.debug("canceling data tasks")
-    tasks.cancel()
-    await tasks
+    for task in tasks:
+        task.cancel()
+    await asyncio.wait(tasks)
     log.debug("canceled data tasks")
 
 
