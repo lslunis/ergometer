@@ -53,6 +53,11 @@ class Tray(wx.adv.TaskBarIcon):
         top.SetTransparent(randint(0, 254))
 
 
+def draw(*args):
+    # log.debug("draw")
+    ...
+
+
 def exit(*args):
     log.info("Ergometer exiting")
     model.exit()
@@ -71,5 +76,9 @@ if __name__ == "__main__":
     top.Show()
     tray = Tray()
     model = Model()
+    timer = wx.Timer(top)
+    top.Bind(wx.EVT_TIMER, draw, timer)
     top.Bind(wx.EVT_CLOSE, exit)
+    hz = wx.Display().GetCurrentMode().refresh or 60
+    timer.Start(int(1000 / hz))
     app.MainLoop()
