@@ -29,17 +29,23 @@ class Interval(namedtuple("Interval", ["start", "end"])):
 
 
 def init():
+    in_dev_mode = len(sys.argv) > 1
     storage_root = os.path.join(os.path.dirname(__file__), sys.argv[1])
     os.makedirs(storage_root, exist_ok=True)
     os.chdir(storage_root)
 
     formatter = logging.Formatter("%(asctime)s %(name)s %(levelname)s %(message)s")
     log.setLevel(logging.DEBUG)
-    for level in (logging.DEBUG, logging.ERROR):
-        handler = logging.FileHandler(logging.getLevelName(level) + ".log")
+    if in_dev_mode:
+        handler = logging.StreamHandler()
         handler.setFormatter(formatter)
-        handler.setLevel(level)
         log.addHandler(handler)
+    else:
+        for level in (logging.DEBUG, logging.ERROR):
+            handler = logging.FileHandler(logging.getLevelName(level) + ".log")
+            handler.setFormatter(formatter)
+            handler.setLevel(level)
+            log.addHandler(handler)
     log.info("Ergometer starting")
 
 
@@ -60,7 +66,7 @@ def retry_on(Error, return_on_success=False, retry_delay=5):
                 except FatalError as fe:
                     raise
                 except Error as e:
-                    log.error(e)
+                    log.exception("retrying")
                     if retry_delay is not None:
                         await asyncio.sleep(retry_delay)
 
@@ -80,7 +86,7 @@ def retry_on_iter(Error, retry_delay=5):
                 except FatalError as fe:
                     raise
                 except Error as e:
-                    log.error(e)
+                    log.exception("retrying")
                     if retry_delay is not None:
                         await asyncio.sleep(retry_delay)
 
