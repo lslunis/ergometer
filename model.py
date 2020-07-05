@@ -33,6 +33,7 @@ class Model:
         return self._local_events.popleft()
 
     def update_cache(self, delta):
+        log.debug(f"update_cache {delta}")
         self._cache = {**self._cache, **delta}
         return self._cache
 
