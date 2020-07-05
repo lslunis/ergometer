@@ -33,10 +33,11 @@ def init():
         "debug": len(sys.argv) > 1,
         "source_root": getattr(sys, "_MEIPASS", os.path.dirname(__file__))
     }
-
     storage_root = os.path.join(config["source_root"], "data")
     if config["debug"]:
         storage_root = os.path.join(storage_root, sys.argv[1])
+        port = config["port"] = sys.argv[2]
+        config["server_url"] = f"ws://localhost:{port}"
     os.makedirs(storage_root, exist_ok=True)
     os.chdir(storage_root)
 
