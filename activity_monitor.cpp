@@ -18,6 +18,7 @@ constexpr UINT_PTR IDT_TIMER1 = 1;
 
 HINSTANCE g_hinst;
 
+bool g_verbose = false;
 bool g_wasActive = false;
 
 vector<DWORD> g_buttonCountIgnoreList; // both keyboards and mice
@@ -128,14 +129,18 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uiMsg, WPARAM wParam, LPARAM lParam) {
 int WINAPI WinMain(HINSTANCE hinst, HINSTANCE, LPSTR lpCmdLine, int) {
     const regex digits{R"(\d+)"};
     const string strCmdLine{lpCmdLine};
-    for (sregex_token_iterator it(strCmdLine.begin(), strCmdLine.end(), digits), end;
-         it != end; ++it) {
-        const ssub_match sm = *it;
-        try {
-            g_buttonCountIgnoreList.push_back(static_cast<DWORD>(stoi(sm)));
-        } catch (const out_of_range&) {
-            fprintf(stderr, "Ignoring out-of-range command-line argument '%s'.\n",
-                    sm.str().c_str());
+    if (strCmdLine == "-v") {
+        g_verbose = true;
+    } else {
+        for (sregex_token_iterator it(strCmdLine.begin(), strCmdLine.end(), digits), end;
+             it != end; ++it) {
+            const ssub_match sm = *it;
+            try {
+                g_buttonCountIgnoreList.push_back(static_cast<DWORD>(stoi(sm)));
+            } catch (const out_of_range&) {
+                fprintf(stderr, "Ignoring out-of-range command-line argument '%s'.\n",
+                        sm.str().c_str());
+            }
         }
     }
 
