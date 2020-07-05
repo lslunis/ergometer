@@ -47,13 +47,10 @@ def client_handler(file_manager):
 
 
 async def main():
-    config = init()
+    port = init()["port"]
     file_manager = FileManager("broker")
-    """
-    import ssl
-    ssl=ssl.SSLContext()
-    """
-    server = await websockets.serve(client_handler(file_manager), port=config["port"])
+    log.debug(f"listening on port {port}")
+    server = await websockets.serve(client_handler(file_manager), port=port)
     await server.wait_closed()
 
 

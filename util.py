@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import logging.handlers
 import os
@@ -32,7 +33,7 @@ class Interval(namedtuple("Interval", ["start", "end"])):
 def init():
     config = {
         "debug": len(sys.argv) > 1,
-        "log_level": logging.WARN,
+        "log_level": logging.WARNING,
         "source_root": getattr(sys, "_MEIPASS", os.path.dirname(__file__)),
         "button_count_ignore_list": [],
     }
@@ -42,6 +43,11 @@ def init():
         storage_root = os.path.join(storage_root, sys.argv[1])
         port = config["port"] = sys.argv[2]
         config["server_url"] = f"ws://localhost:{port}"
+    else:
+        with open(os.path.join(config["source_root"], "config.json")) as f:
+            config.update(json.load(f))
+
+
     os.makedirs(storage_root, exist_ok=True)
     os.chdir(storage_root)
 
