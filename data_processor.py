@@ -301,7 +301,7 @@ async def activity_monitor(push_local_event, *args):
 @asynccontextmanager
 async def exec(args):
     subprocess = await asyncio.create_subprocess_exec(
-        command, *args, stdout=asyncio.subprocess.PIPE
+        *args, stdout=asyncio.subprocess.PIPE
     )
     out = subprocess.stdout
     yield out
@@ -313,7 +313,7 @@ async def exec(args):
 
 
 def make_event(time):
-    return struct.pack(data_format, EventType.action.value - 1, 1, time)
+    return struct.pack(data_format, EventType.action.value, 1, time - 1)
 
 
 async def data_worker(model):
@@ -344,4 +344,6 @@ async def data_worker(model):
 
 
 def run_loop(model):
-    asyncio.run(data_worker(model))
+    asyncio.run(data_worker(model), debug=True)
+    # TODO: make debug=True true in dev mode
+    # TODO: async log decorator

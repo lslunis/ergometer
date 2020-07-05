@@ -71,7 +71,7 @@ def show_settings(settings, push_local_event):
 
 def draw(*args):
     metrics = model.metrics_at(precise_clock().timestamp())
-    log.debug(metrics)
+    # log.debug(metrics)
 
 
 def exit(*args):
@@ -85,7 +85,7 @@ def exit(*args):
 
 if __name__ == "__main__":
     init()
-    log.setLevel(20)
+    # log.setLevel(20)
     app = wx.App()
     style = wx.TRANSPARENT_WINDOW | wx.STAY_ON_TOP | wx.FRAME_TOOL_WINDOW | wx.MAXIMIZE
     top = wx.Frame(None, style=style) if os.name == "nt" else wx.Frame(None)
