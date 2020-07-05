@@ -13,7 +13,7 @@ import websockets
 from . import messages as m
 from .database import EventType, data_format, database_updater
 from .time import imprecise_clock
-from .util import FatalError, die_unless, log, retry_on, retry_on_iter
+from .util import async_log_exceptions, die_unless, log, retry_on, retry_on_iter
 
 # trim at startup
 # mark irrecoverable data
@@ -24,6 +24,7 @@ class IntegrityError(Exception):
 
 
 # Read local events for "host", writing them to "broker".
+@async_log_exceptions
 async def local_event_publisher(host, broker, file_manager):
     log.debug("Starting local_event_publisher")
     position = await broker.host_position(host)
@@ -33,6 +34,7 @@ async def local_event_publisher(host, broker, file_manager):
         position = await broker.write(host, data, position)
 
 
+@async_log_exceptions
 async def local_event_writer(host, pop_local_event, file_manager):
     log.debug("Starting local_event_writer")
     while True:
@@ -49,6 +51,7 @@ async def local_event_writer(host, pop_local_event, file_manager):
 
 # Read all changes from "broker" for other hosts and write them using
 # "file_manager".
+@async_log_exceptions
 async def change_subscriber(self_host, broker, file_manager):
     log.debug("Starting change_subscriber")
     # Initialize.
@@ -284,6 +287,7 @@ async def read_with_host(file_manager, host, position, batch_size):
     return (host, position, data)
 
 
+@async_log_exceptions
 async def activity_monitor(push_local_event, *args):
     log.debug("Starting activity_monitor")
     if os.name == "nt":
@@ -316,6 +320,7 @@ def make_event(time):
     return struct.pack(data_format, EventType.action.value, 1, time - 1)
 
 
+@async_log_exceptions
 async def data_worker(model):
     log.debug("Starting data_worker")
     host = get_current_host(model.storage_root)

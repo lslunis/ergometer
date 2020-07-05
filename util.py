@@ -49,7 +49,7 @@ def init():
     log.info("Ergometer starting")
 
 
-def log_exception(fn):
+def log_exceptions(fn):
     @wraps(fn)
     def logged(*args, **kw):
         try:
@@ -61,7 +61,7 @@ def log_exception(fn):
     return logged
 
 
-def async_log_exception():
+def async_log_exceptions(fn):
     @wraps(fn)
     async def logged(*args, **kw):
         try:

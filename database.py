@@ -10,6 +10,7 @@ from sqlalchemy.orm import sessionmaker
 
 from .time import day_start_of, imprecise_clock, in_seconds, is_on_day, max_time
 from .util import (
+    async_log_exceptions,
     Interval,
     PositionError,
     die_unless,
@@ -274,6 +275,7 @@ setting_types = [t for t in EventType.__members__.values() if t.is_setting]
 data_format = "<BxxxIQ"
 
 
+@async_log_exceptions
 @retry_on(PositionError)
 async def database_updater(Session, update_cache, subscribe):
     log.debug("Starting database_updater")
