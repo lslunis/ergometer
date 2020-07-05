@@ -49,7 +49,7 @@ def client_handler(file_manager):
 async def main():
     init()
     port = sys.argv[2]
-    file_manager = FileManager("broker", ".")
+    file_manager = FileManager("broker")
     """
     import ssl
     ssl=ssl.SSLContext()

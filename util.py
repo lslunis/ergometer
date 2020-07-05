@@ -29,14 +29,20 @@ class Interval(namedtuple("Interval", ["start", "end"])):
 
 
 def init():
-    in_dev_mode = len(sys.argv) > 1
-    storage_root = os.path.join(os.path.dirname(__file__), sys.argv[1])
+    config = {
+        "debug": len(sys.argv) > 1,
+        "source_root": getattr(sys, "_MEIPASS", os.path.dirname(__file__))
+    }
+
+    storage_root = os.path.join(config["source_root"], "data")
+    if config["debug"]:
+        storage_root = os.path.join(storage_root, sys.argv[1])
     os.makedirs(storage_root, exist_ok=True)
     os.chdir(storage_root)
 
     formatter = logging.Formatter("%(asctime)s %(name)s %(levelname)s %(message)s")
     log.setLevel(logging.DEBUG)
-    if in_dev_mode:
+    if config["debug"]:
         handler = logging.StreamHandler()
         handler.setFormatter(formatter)
         log.addHandler(handler)
@@ -47,6 +53,8 @@ def init():
             handler.setLevel(level)
             log.addHandler(handler)
     log.info("Ergometer starting")
+
+    return config
 
 
 def log_exceptions(fn):
@@ -126,3 +134,4 @@ def takeuntil_inclusive(predicate, iterable):
         yield x
         if predicate(x):
             return
+

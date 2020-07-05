@@ -85,7 +85,7 @@ def main():
         top.Destroy()
         log.info("Ergometer exited")
 
-    init()
+    config = init()
 
     # log.setLevel(20)
     app = wx.App()
@@ -94,7 +94,7 @@ def main():
     top.SetTransparent(0)
     top.Show()
     tray = Tray(top)
-    model = Model()
+    model = Model(config)
     settings = {"daily_target": 1800, "session_target": 300}
     show_settings(settings, model.push_local_event, top)
     timer = wx.Timer(top)

@@ -11,12 +11,12 @@ from .util import log
 
 
 class Model:
-    def __init__(self):
+    def __init__(self, config):
+        self.config = config
         self._exit_event = Event()
         self._local_events = deque()
         self.Session = connect("sqlite:///data.sqlite")
         self._cache = {}
-        self.storage_root = "."
         self.cloud_broker_address = sys.argv[2]
         self._thread = Thread(target=run_loop, args=(self,))
         self._thread.start()

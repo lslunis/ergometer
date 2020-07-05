@@ -150,8 +150,7 @@ class HostFile:
 
 # Reads and writes data for particular hosts.
 class FileManager:
-    def __init__(self, host, storage_root):
-        self.storage_root = storage_root
+    def __init__(self, host):
         self.host = host
         self.hosts = {}
         self.new_file = asyncio.Event()
@@ -165,7 +164,7 @@ class FileManager:
         self.new_file = asyncio.Event()
 
     def host_path(self, host):
-        return os.path.join(self.storage_root, f"{host}.hostlog")
+        return f"{host}.hostlog"
 
     @property
     def positions(self):
@@ -260,8 +259,8 @@ class BrokerClient:
             return resp.pos
 
 
-def get_current_host(storage_root):
-    host_path = os.path.join(storage_root, "self.host")
+def get_current_host():
+    host_path = "self.host"
     if path.exists(host_path):
         with open(host_path) as f:
             return f.read()
@@ -323,9 +322,9 @@ def make_event(time):
 @async_log_exceptions
 async def data_worker(model):
     log.debug("Starting data_worker")
-    host = get_current_host(model.storage_root)
+    host = get_current_host()
     die_unless(len(host) > 0, "host is empty")
-    file_manager = FileManager(host, model.storage_root)
+    file_manager = FileManager(host)
     broker = BrokerClient(model.cloud_broker_address)
 
     tasks = [
@@ -333,7 +332,7 @@ async def data_worker(model):
         for coro in [
             change_subscriber(host, broker, file_manager),
             local_event_publisher(host, broker, file_manager),
-            activity_monitor(model.push_local_event, "../activity_monitor.exe"),
+            activity_monitor(model.push_local_event, os.path.join(model.config["source_root"], "activity_monitor.exe")),
             local_event_writer(host, model.pop_local_event, file_manager),
             database_updater(model.Session, model.update_cache, file_manager.subscribe),
         ]
@@ -349,6 +348,4 @@ async def data_worker(model):
 
 
 def run_loop(model):
-    asyncio.run(data_worker(model), debug=True)
-    # TODO: make debug=True true in dev mode
-    # TODO: async log decorator
+    asyncio.run(data_worker(model), debug=model.config["debug"])
