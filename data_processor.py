@@ -335,7 +335,7 @@ async def data_worker(model):
             activity_monitor(
                 model.push_local_event,
                 os.path.join(model.config["source_root"], "activity_monitor.exe"),
-                *model.config["button_count_ignore_list"]
+                *model.config["button_count_ignore_list"],
             ),
             local_event_writer(host, model.pop_local_event, file_manager),
             database_updater(model.Session, model.update_cache, file_manager.subscribe),

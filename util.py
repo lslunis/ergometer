@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import logging.handlers
 import os
 import sys
 from collections import namedtuple
@@ -31,11 +32,13 @@ class Interval(namedtuple("Interval", ["start", "end"])):
 def init():
     config = {
         "debug": len(sys.argv) > 1,
+        "log_level": logging.WARN,
         "source_root": getattr(sys, "_MEIPASS", os.path.dirname(__file__)),
         "button_count_ignore_list": [],
     }
     storage_root = os.path.join(config["source_root"], "data")
     if config["debug"]:
+        config["log_level"] = logging.DEBUG
         storage_root = os.path.join(storage_root, sys.argv[1])
         port = config["port"] = sys.argv[2]
         config["server_url"] = f"ws://localhost:{port}"
@@ -43,17 +46,16 @@ def init():
     os.chdir(storage_root)
 
     formatter = logging.Formatter("%(asctime)s %(name)s %(levelname)s %(message)s")
-    log.setLevel(logging.DEBUG)
-    if config["debug"]:
-        handler = logging.StreamHandler()
-        handler.setFormatter(formatter)
-        log.addHandler(handler)
-    else:
-        for level in (logging.DEBUG, logging.ERROR):
-            handler = logging.FileHandler(logging.getLevelName(level) + ".log")
-            handler.setFormatter(formatter)
-            handler.setLevel(level)
-            log.addHandler(handler)
+    log.setLevel(config["log_level"])
+
+    console = logging.StreamHandler()
+    console.setFormatter(formatter)
+    log.addHandler(console)
+    file = logging.handlers.RotatingFileHandler(
+        "ergometer.log", maxBytes=int(1e7), backupCount=1
+    )
+    file.setFormatter(formatter)
+    log.addHandler(file)
     log.info("Ergometer starting")
 
     return config
