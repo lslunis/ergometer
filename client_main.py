@@ -58,14 +58,59 @@ def show_settings(settings, push_local_event, top):
     frame = wx.Frame(top)
     sizer = wx.FlexGridSizer(3, 16, 16)
     frame.SetSizer(sizer)
+
+    def add_label(text):
+        label = wx.StaticText(frame, label=text)
+        sizer.Add(label)
+
+    controls = []
     for name, value in settings.items():
-        name_text = wx.StaticText(frame, label=name.capitalize().replace("_", " "))
-        value_text = wx.StaticText(frame, label=str(value))
-        sizer.Add(name_text)
-        sizer.Add(value_text)
-        text_ctrl = wx.TextCtrl(frame)
-        sizer.Add(text_ctrl)
-        log.info(value_text.GetSize())
+        add_label(name.capitalize().replace("_", " "))
+        add_label(str(value))
+
+        field = wx.TextCtrl(frame)
+        sizer.Add(field)
+        controls.append(field)
+
+    def save(*args):
+        if save.waiting:
+            wait()
+            timer.Start(1000)
+            for ctrl in controls:
+                ctrl.Disable()
+        else:
+            log.debug("save")
+
+    def wait(*args):
+        if save.waiting > 0:
+            save_button.SetLabel(f"Save ({save.waiting})")
+            save.waiting -= 1
+        else:
+            timer.Stop()
+            save_button.Enable()
+            save_button.SetLabel("Save")
+
+    def cancel(*args):
+        save.waiting = 5
+        timer.Stop()
+        save_button.SetLabel("Preview")
+        for ctrl in controls:
+            ctrl.Enable()
+
+
+    timer = wx.Timer(frame)
+    frame.Bind(wx.EVT_TIMER, wait, timer)
+
+    save.waiting = 5
+    save_button = wx.Button(frame, label="Preview")
+    save_button.Bind(wx.EVT_BUTTON, save)
+    sizer.Add(save_button)
+    controls.append(save_button)
+
+    cancel_button = wx.Button(frame, label="Cancel")
+    cancel_button.Bind(wx.EVT_BUTTON, cancel)
+    sizer.Add(cancel_button)
+
     frame.Show()
 
 
