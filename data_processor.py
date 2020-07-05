@@ -315,7 +315,7 @@ async def run_subprocess(push_local_event, command, args):
 
 
 def make_event(time):
-    return struct.pack(data_format, EventType.action.value, 1, time)
+    return struct.pack(data_format, EventType.action.value - 1, 1, time)
 
 
 async def data_worker(model):

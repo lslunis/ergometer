@@ -68,6 +68,7 @@ def show_settings(settings, push_local_event):
         log.info(value_text.GetSize())
     frame.Show()
 
+
 def draw(*args):
     metrics = model.metrics_at(precise_clock().timestamp())
     log.debug(metrics)
