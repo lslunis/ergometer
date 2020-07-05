@@ -49,6 +49,32 @@ def init():
     log.info("Ergometer starting")
 
 
+def log_exception(fn):
+    @wraps(fn)
+    def logged(*args, **kw):
+        try:
+            return fn(*args, **kw)
+        except:
+            log.exception("unexpected error")
+            raise
+
+    return logged
+
+
+def async_log_exception():
+    @wraps(fn)
+    async def logged(*args, **kw):
+        try:
+            return await fn(*args, **kw)
+        except asyncio.CancelledError:
+            raise
+        except:
+            log.exception("unexpected error")
+            raise
+
+    return logged
+
+
 def pairwise(iterable):
     iterator = iter(iterable)
     return zip(iterator, iterator)
