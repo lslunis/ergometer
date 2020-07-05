@@ -5,10 +5,11 @@ import websockets
 
 from . import messages as m
 from .data_processor import FileManager
-from .util import FatalError, init, log
+from .util import async_log_exceptions, FatalError, init, log
 
 
 # Handles "read" calls. Sends an unending stream of data to a client.
+@async_log_exceptions
 async def send_updates(file_manager, websocket, client_positions, exclude=None):
     async for host, pos, data in file_manager.subscribe(client_positions, exclude):
         msg = m.ReadResponse(None, host=host, pos=pos, data=data)
@@ -16,6 +17,7 @@ async def send_updates(file_manager, websocket, client_positions, exclude=None):
 
 
 def client_handler(file_manager):
+    @async_log_exceptions
     async def handle_client(websocket, path):
         try:
             async for message in websocket:
