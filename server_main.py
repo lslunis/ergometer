@@ -52,7 +52,7 @@ async def main():
     import ssl
     ssl=ssl.SSLContext()
     """
-    server = await websockets.serve(client_handler(file_manager), "localhost", port)
+    server = await websockets.serve(client_handler(file_manager), port=port)
     await server.wait_closed()
 
 
