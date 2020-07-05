@@ -304,7 +304,7 @@ async def activity_monitor(push_local_event, *args):
 @asynccontextmanager
 async def exec(args):
     subprocess = await asyncio.create_subprocess_exec(
-        *args, stdout=asyncio.subprocess.PIPE
+        *map(str, args), stdout=asyncio.subprocess.PIPE
     )
     out = subprocess.stdout
     yield out
@@ -332,7 +332,11 @@ async def data_worker(model):
         for coro in [
             change_subscriber(host, broker, file_manager),
             local_event_publisher(host, broker, file_manager),
-            activity_monitor(model.push_local_event, os.path.join(model.config["source_root"], "activity_monitor.exe")),
+            activity_monitor(
+                model.push_local_event,
+                os.path.join(model.config["source_root"], "activity_monitor.exe"),
+                *model.config["button_count_ignore_list"]
+            ),
             local_event_writer(host, model.pop_local_event, file_manager),
             database_updater(model.Session, model.update_cache, file_manager.subscribe),
         ]

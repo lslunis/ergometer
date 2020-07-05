@@ -31,7 +31,8 @@ class Interval(namedtuple("Interval", ["start", "end"])):
 def init():
     config = {
         "debug": len(sys.argv) > 1,
-        "source_root": getattr(sys, "_MEIPASS", os.path.dirname(__file__))
+        "source_root": getattr(sys, "_MEIPASS", os.path.dirname(__file__)),
+        "button_count_ignore_list": [],
     }
     storage_root = os.path.join(config["source_root"], "data")
     if config["debug"]:
@@ -135,4 +136,3 @@ def takeuntil_inclusive(predicate, iterable):
         yield x
         if predicate(x):
             return
-
