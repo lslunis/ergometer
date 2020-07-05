@@ -6,6 +6,7 @@ import os.path as path
 import struct
 import sys
 import uuid
+from contextlib import asynccontextmanager
 
 import websockets
 
@@ -283,10 +284,13 @@ async def read_with_host(file_manager, host, position, batch_size):
     return (host, position, data)
 
 
-async def activity_monitor(push_local_event):
+async def activity_monitor(push_local_event, *args):
     log.debug("Starting activity_monitor")
     if os.name == "nt":
-        return await run_subprocess(push_local_event, "../activity_monitor.exe", [])
+        async with exec(args) as out:
+            while True:
+                time = int(await out.readuntil())
+                push_local_event(make_event(time))
 
     # Non-windows.
     while True:
@@ -294,24 +298,18 @@ async def activity_monitor(push_local_event):
         await asyncio.sleep(1)
 
 
-async def run_subprocess(push_local_event, command, args):
-    log.debug("Starting run_subprocess")
+@asynccontextmanager
+async def exec(args):
     subprocess = await asyncio.create_subprocess_exec(
         command, *args, stdout=asyncio.subprocess.PIPE
     )
     out = subprocess.stdout
-    try:
-        while True:
-            time = int(await out.readuntil())
-            push_local_event(make_event(time))
-    except asyncio.CancelledError:
-        ...
-    finally:
-        log.debug("closing subprocess")
-        out.close()
-        subprocess.terminate()
-        await asyncio.gather(out.wait_closed(), subprocess.wait())
-        log.debug("closed subprocess")
+    yield out
+    log.debug("closing subprocess")
+    out.close()
+    subprocess.terminate()
+    await asyncio.gather(out.wait_closed(), subprocess.wait())
+    log.debug("closed subprocess")
 
 
 def make_event(time):
@@ -330,7 +328,7 @@ async def data_worker(model):
         for coro in [
             change_subscriber(host, broker, file_manager),
             local_event_publisher(host, broker, file_manager),
-            activity_monitor(model.push_local_event),
+            activity_monitor(model.push_local_event, "../activity_monitor.exe"),
             local_event_writer(host, model.pop_local_event, file_manager),
             database_updater(model.Session, model.update_cache, file_manager.subscribe),
         ]
