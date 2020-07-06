@@ -6,17 +6,17 @@ import venv
 from subprocess import run
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
-is_windows = os.name == "nt"
+is_windows = not run(['which', 'cmd.exe']).returncode
 bin_dir = os.path.join("venv", "Scripts" if is_windows else "bin")
 
 
 def mtime(path):
-    return os.stat(path).st_mtime_ns
+    return os.path.exists(path) and os.stat(path).st_mtime_ns
 
 
 def build(*args):
     if is_windows and mtime("activity_monitor.exe") < mtime("activity_monitor.cpp"):
-        run("build_activity_monitor.bat")
+        run("cmd.exe /c build_activity_monitor.bat".split())
 
     if not os.path.exists("venv/pyvenv.cfg"):
         venv.create("venv", with_pip=True)

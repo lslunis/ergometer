@@ -57,6 +57,9 @@ void OnInput(HRAWINPUT hRawInput) {
     }
 
     if (!input->header.hDevice) {
+        if (g_verbose) {
+            fprintf(stderr, "%p %u\n", input->header.hDevice, input->header.dwType);
+        }
         return; // skip null handles (representing synthetic keyboards/mice?)
     }
 
@@ -82,7 +85,13 @@ void OnInput(HRAWINPUT hRawInput) {
                                    ? device_info.keyboard.dwNumberOfKeysTotal
                                    : device_info.mouse.dwNumberOfButtons;
 
-    if (find(g_buttonCountIgnoreList.begin(), g_buttonCountIgnoreList.end(), button_count)
+    if (g_verbose) {
+        fprintf(stderr, "%p %u %u\n", input->header.hDevice, input->header.dwType,
+                button_count);
+    }
+
+    if (find(g_buttonCountIgnoreList.begin(), g_buttonCountIgnoreList.end(),
+             button_count)
         != g_buttonCountIgnoreList.end()) {
         return; // skip keyboards/mice with denied button counts
     }
@@ -132,7 +141,8 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE, LPSTR lpCmdLine, int) {
     if (strCmdLine == "-v") {
         g_verbose = true;
     } else {
-        for (sregex_token_iterator it(strCmdLine.begin(), strCmdLine.end(), digits), end;
+        for (sregex_token_iterator it(strCmdLine.begin(), strCmdLine.end(), digits),
+             end;
              it != end; ++it) {
             const ssub_match sm = *it;
             try {
