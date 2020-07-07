@@ -303,17 +303,16 @@ async def activity_monitor(push_local_event, *args):
 
 @asynccontextmanager
 async def exec(args):
-    subprocess = await asyncio.create_subprocess_exec(
-        *map(str, args), stdout=asyncio.subprocess.PIPE
-    )
-    out = subprocess.stdout
-    yield out
-    log.debug("closing subprocess")
-    out.close()
-    subprocess.terminate()
-    await asyncio.gather(out.wait_closed(), subprocess.wait())
-    log.debug("closed subprocess")
-
+    try:
+        subprocess = await asyncio.create_subprocess_exec(
+            *map(str, args), stdout=asyncio.subprocess.PIPE
+        )
+        yield subprocess.stdout
+    finally:
+        log.debug("closing subprocess")
+        subprocess.terminate()
+        await subprocess.wait()
+        log.debug("closed subprocess")
 
 def make_event(time):
     return struct.pack(data_format, EventType.action.value, 1, time - 1)
