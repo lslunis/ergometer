@@ -6,7 +6,7 @@ import venv
 from subprocess import run
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
-is_windows = not run(['which', 'cmd.exe']).returncode
+is_windows = not run(["which", "cmd.exe"]).returncode
 bin_dir = os.path.join("venv", "Scripts" if is_windows else "bin")
 
 

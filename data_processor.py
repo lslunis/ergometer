@@ -325,7 +325,7 @@ async def data_worker(model):
     host = get_current_host()
     die_unless(len(host) > 0, "host is empty")
     file_manager = FileManager(host)
-    broker = BrokerClient(model.config["server_url"])
+    broker = BrokerClient(model.config["server"])
 
     tasks = [
         asyncio.create_task(coro)

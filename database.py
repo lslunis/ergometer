@@ -10,9 +10,9 @@ from sqlalchemy.orm import sessionmaker
 
 from .time import day_start_of, imprecise_clock, in_seconds, is_on_day, max_time
 from .util import (
-    async_log_exceptions,
     Interval,
     PositionError,
+    async_log_exceptions,
     die_unless,
     log,
     pairwise,

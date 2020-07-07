@@ -5,7 +5,7 @@ import websockets
 
 from . import messages as m
 from .data_processor import FileManager
-from .util import async_log_exceptions, FatalError, init, log
+from .util import FatalError, async_log_exceptions, init, log
 
 
 # Handles "read" calls. Sends an unending stream of data to a client.

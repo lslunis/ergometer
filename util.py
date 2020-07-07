@@ -1,3 +1,4 @@
+import argparse
 import asyncio
 import json
 import logging
@@ -6,7 +7,6 @@ import os
 import sys
 from collections import namedtuple
 from functools import wraps
-
 
 log = logging.getLogger("ergometer")
 
@@ -32,39 +32,55 @@ class Interval(namedtuple("Interval", ["start", "end"])):
 
 def init():
     config = {
-        "debug": len(sys.argv) > 1,
-        "log_level": logging.WARNING,
+        "button_count_ignore_list": [],
+        "data": "",
+        "debug": False,
+        "log": 10,
+        "port": 8888,
         "source_root": getattr(
             sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__))
         ),
-        "button_count_ignore_list": [],
+        "verbose": False,
     }
-    storage_root = os.path.join(config["source_root"], "data")
-    if config["debug"]:
-        config["log_level"] = logging.DEBUG
-        storage_root = os.path.join(storage_root, sys.argv[1])
-        port = config["port"] = sys.argv[2]
-        config["server_url"] = f"ws://localhost:{port}"
-    else:
-        with open(os.path.join(config["source_root"], "config.json")) as f:
-            config.update(json.load(f))
+    with open(os.path.join(config["source_root"], "config.json")) as f:
+        config.update(json.load(f))
+    p = argparse.ArgumentParser(argument_default=argparse.SUPPRESS)
+    p.add_argument("--button_count_ignore_list")
+    p.add_argument("--data")
+    p.add_argument("--debug", action="store_true")
+    p.add_argument("--log", type=int)
+    p.add_argument("--port", type=int)
+    p.add_argument("--server")
+    p.add_argument("--verbose", action="store_true")
+    config.update(vars(p.parse_args()))
+    config.setdefault("server", "ws://localhost:{port}".format(**config))
 
+    storage_root = os.path.join(config["source_root"], "data", config["data"])
     os.makedirs(storage_root, exist_ok=True)
     os.chdir(storage_root)
 
+    loggers = (
+        [
+            logging.getLogger(name)
+            for name in [None, "asyncio", "sqlalchemy.engine", "websockets"]
+        ]
+        if config["verbose"]
+        else [log]
+    )
+    for logger in loggers:
+        logger.setLevel(config["log"])
+    root = loggers[0]
     formatter = logging.Formatter("%(asctime)s %(name)s %(levelname)s %(message)s")
-    log.setLevel(config["log_level"])
-
     console = logging.StreamHandler()
     console.setFormatter(formatter)
-    log.addHandler(console)
+    root.addHandler(console)
     file = logging.handlers.RotatingFileHandler(
         "ergometer.log", maxBytes=int(1e7), backupCount=1
     )
     file.setFormatter(formatter)
-    log.addHandler(file)
-    log.info("Ergometer starting")
+    root.addHandler(file)
 
+    log.info("Ergometer starting")
     return config
 
 
@@ -111,7 +127,7 @@ def retry_on(Error, return_on_success=False, retry_delay=5):
                 except FatalError as fe:
                     raise
                 except Error as e:
-                    log.exception("retrying")
+                    log.debug(f"retrying: {e}")
                     if retry_delay is not None:
                         await asyncio.sleep(retry_delay)
 
@@ -131,7 +147,7 @@ def retry_on_iter(Error, retry_delay=5):
                 except FatalError as fe:
                     raise
                 except Error as e:
-                    log.exception("retrying")
+                    log.debug(f"retrying: {e}")
                     if retry_delay is not None:
                         await asyncio.sleep(retry_delay)
 

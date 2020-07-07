@@ -97,7 +97,6 @@ def show_settings(settings, push_local_event, top):
         for ctrl in controls:
             ctrl.Enable()
 
-
     timer = wx.Timer(frame)
     frame.Bind(wx.EVT_TIMER, wait, timer)
 
