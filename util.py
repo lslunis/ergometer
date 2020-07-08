@@ -46,6 +46,7 @@ def init():
     p = argparse.ArgumentParser(argument_default=argparse.SUPPRESS)
     p.add_argument("--button_count_ignore_list")
     p.add_argument("--data")
+    p.add_argument("--generate_activity", action="store_true")
     p.add_argument("--log", type=int)
     p.add_argument("--port", type=int)
     p.add_argument("--server")

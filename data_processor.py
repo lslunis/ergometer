@@ -291,18 +291,17 @@ async def read_with_host(file_manager, host, position, batch_size):
 
 
 @async_log_exceptions
-async def activity_monitor(push_local_event, *args):
+async def activity_monitor(push_local_event, generate_activity, *args):
     log.debug("Starting activity_monitor")
-    if os.name == "nt":
+    if generate_activity:
+        while True:
+            push_local_event(make_event(int(imprecise_clock().timestamp())))
+            await asyncio.sleep(1)
+    elif os.name == "nt":
         async with exec(args) as out:
             while True:
                 time = int(await out.readuntil())
                 push_local_event(make_event(time))
-
-    # Non-windows.
-    while True:
-        push_local_event(make_event(int(imprecise_clock().timestamp())))
-        await asyncio.sleep(1)
 
 
 @asynccontextmanager
@@ -338,6 +337,7 @@ async def data_worker(model):
             local_event_publisher(host, broker, file_manager),
             activity_monitor(
                 model.push_local_event,
+                model.config["generate_activity"],
                 os.path.join(model.config["source_root"], "activity_monitor.exe"),
                 *model.config["button_count_ignore_list"],
             ),

@@ -52,6 +52,7 @@ async def main():
     log.debug(f"listening on port {port}")
     server = await websockets.serve(client_handler(file_manager), port=port)
     await server.wait_closed()
-    log.info('Ergometer exited')
+    log.info("Ergometer exited")
+
 
 asyncio.run(main())

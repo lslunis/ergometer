@@ -2,7 +2,7 @@ import struct
 import sys
 from collections import deque
 from datetime import datetime
-from threading import Event, Thread
+from threading import Thread
 
 from .data_processor import run_loop
 from .database import EventType, connect, data_format
@@ -11,14 +11,18 @@ from .util import log
 
 
 class Model:
-    def __init__(self, config):
+    def __init__(self, config, threaded=False):
         self.config = config
-        self._exit_event = Event()
+        self.exiting = False
         self._local_events = deque()
         self.Session = connect("sqlite:///data.sqlite")
         self._cache = {}
-        self._thread = Thread(target=run_loop, args=(self,))
-        self._thread.start()
+        if threaded:
+            self._thread = Thread(target=run_loop, args=(self,))
+            self._thread.start()
+        else:
+            self._thread = None
+            run_loop(self)
 
     def push_local_event(self, event):
         id, value, time = struct.unpack(data_format, event)
@@ -50,12 +54,9 @@ class Model:
     def activity_running_total(self, start, end):
         return
 
-    @property
-    def exiting(self):
-        return self._exit_event.is_set()
-
     def exit(self):
-        log.debug("data thread exiting")
-        self._exit_event.set()
-        self._thread.join()
-        log.debug("data thread exited")
+        log.debug("data loop exiting")
+        self.exiting = True
+        if self._thread:
+            self._thread.join()
+        log.debug("data loop exited")
