@@ -34,7 +34,6 @@ def init():
     config = {
         "button_count_ignore_list": [],
         "data": "",
-        "debug": False,
         "log": 10,
         "port": 8888,
         "source_root": getattr(
@@ -47,7 +46,6 @@ def init():
     p = argparse.ArgumentParser(argument_default=argparse.SUPPRESS)
     p.add_argument("--button_count_ignore_list")
     p.add_argument("--data")
-    p.add_argument("--debug", action="store_true")
     p.add_argument("--log", type=int)
     p.add_argument("--port", type=int)
     p.add_argument("--server")

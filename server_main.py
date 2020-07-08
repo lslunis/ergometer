@@ -22,7 +22,7 @@ def client_handler(file_manager):
         try:
             async for message in websocket:
                 msg = m.Message.decode(message)
-                log.debug(f"processing message {msg.type}")
+                log.info(f"processing message {msg.type}")
                 if msg.type == m.ReadRequest.TYPE:
                     asyncio.create_task(
                         send_updates(
@@ -52,6 +52,6 @@ async def main():
     log.debug(f"listening on port {port}")
     server = await websockets.serve(client_handler(file_manager), port=port)
     await server.wait_closed()
-
+    log.info('Ergometer exited')
 
 asyncio.run(main())

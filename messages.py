@@ -1,6 +1,7 @@
 import base64
 import copy
 import json
+from time import time_ns
 
 from .util import log
 
@@ -38,19 +39,20 @@ class Message(metaclass=Registrar):
         return self.TYPE
 
     def encode(self):
-        log.debug("encoding")
+        start = time_ns()
         encoded = copy.copy(self.fields)
         encoded["type"] = self.TYPE
         encoded["error"] = self.error
         if "data" in encoded:
             encoded["data"] = base64.b64encode(encoded["data"]).decode("ascii")
         data = json.dumps(encoded)
-        log.debug(f"encoded {len(data)}")
+        elapsed = time_ns() - start
+        log.debug(f"encoded {len(data)}B in {elapsed/1e9:.3f}s")
         return data
 
     @classmethod
     def decode(cls, blob):
-        log.debug(f"decoding {len(blob)}")
+        start = time_ns()
         msg = json.loads(blob)
         msg_type = msg["type"]
         if "data" in msg:
@@ -62,7 +64,8 @@ class Message(metaclass=Registrar):
         error = msg["error"]
         del msg["error"]
         instance = TYPE_MAP[msg_type](error, **msg)
-        log.debug("decoded")
+        elapsed = time_ns() - start
+        log.debug(f"decoded {len(blob)}B in {elapsed/1e9:.3f}s")
         return instance
 
 

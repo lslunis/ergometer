@@ -7,6 +7,7 @@ import struct
 import sys
 import uuid
 from contextlib import asynccontextmanager
+from time import time_ns
 
 import websockets
 
@@ -105,9 +106,11 @@ class HostFile:
                 raise IntegrityError(
                     f"Tried to write {to_write_len} bytes to {self.path}, which is not divisible by 16"
                 )
-            log.debug("writing")
+
+            start = time_ns()
             bytes_written = f.write(to_write)
-            log.debug(f"wrote {bytes_written}")
+            elapsed = time_ns() - start
+            log.debug(f"wrote {bytes_written}B in {elapsed/1e9:.3f}s")
             die_unless(
                 bytes_written == len(to_write), f"Failed to write to file {self.path}"
             )
@@ -142,9 +145,10 @@ class HostFile:
             f.seek(position)
             desired_bytes = batch_size * 16
             available_bytes = file_size - position
-            log.debug("reading")
+            start = time_ns()
             data = f.read(min(desired_bytes, available_bytes))
-            log.debug(f"read {len(data)}")
+            elapsed = time_ns() - start
+            log.debug(f"read {len(data)}B in {elapsed/1e9:.3f}s")
         return data
 
 
@@ -314,6 +318,7 @@ async def exec(args):
         await subprocess.wait()
         log.debug("closed subprocess")
 
+
 def make_event(time):
     return struct.pack(data_format, EventType.action.value, 1, time - 1)
 
@@ -351,4 +356,4 @@ async def data_worker(model):
 
 
 def run_loop(model):
-    asyncio.run(data_worker(model), debug=model.config["debug"])
+    asyncio.run(data_worker(model), debug=model.config["verbose"])

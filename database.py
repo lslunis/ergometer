@@ -3,6 +3,7 @@ from bisect import bisect_left, bisect_right
 from enum import Enum
 from functools import total_ordering
 from itertools import chain, dropwhile, islice, repeat
+from time import time_ns
 
 from sqlalchemy import Boolean, Column, Integer, String, create_engine, event, func
 from sqlalchemy.ext.declarative import declarative_base
@@ -280,13 +281,10 @@ data_format = "<BxxxIQ"
 async def database_updater(Session, update_cache, subscribe):
     log.debug("Starting database_updater")
     cache, host_positions = init(update_cache, imprecise_clock(), Session())
-    log.debug("database_updater initialized")
     async for args in subscribe(host_positions):
-        log.debug("updating database")
         cache = update_database(
             cache, update_cache, imprecise_clock(), Session(), *args
         )
-        log.debug("database updated")
 
 
 def init(update_cache, now, session):
@@ -307,6 +305,7 @@ def init(update_cache, now, session):
 
 
 def update_database(cache, update_cache, now, session, host, position, data):
+    start = time_ns()
     HostPosition.update(session, host, data, position)
 
     today_start = day_start_of(now)
@@ -363,4 +362,7 @@ def update_database(cache, update_cache, now, session, host, position, data):
     if max_activity_end > rest_start:
         delta["rest_start"] = max_activity_end
     session.commit()
-    return update_cache(delta)
+    cache = update_cache(delta)
+    elapsed = time_ns() - start
+    log.debug(f"database updated with {len(data)}B of events in {elapsed/1e9:.3f}s")
+    return cache
