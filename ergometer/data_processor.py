@@ -9,12 +9,17 @@ import uuid
 from contextlib import asynccontextmanager
 from time import time_ns
 
+import ergometer.messages as m
 import websockets
-
-from . import messages as m
-from .database import EventType, data_format, database_updater
-from .time import imprecise_clock
-from .util import async_log_exceptions, die_unless, log, retry_on, retry_on_iter
+from ergometer.database import EventType, data_format, database_updater
+from ergometer.time import imprecise_clock
+from ergometer.util import (
+    async_log_exceptions,
+    die_unless,
+    log,
+    retry_on,
+    retry_on_iter,
+)
 
 # trim at startup
 # mark irrecoverable data

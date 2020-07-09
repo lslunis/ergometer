@@ -3,7 +3,7 @@ import copy
 import json
 from time import time_ns
 
-from .util import log
+from ergometer.util import log
 
 TYPE_MAP = {}
 

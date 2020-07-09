@@ -1,8 +1,8 @@
 import struct
 from datetime import datetime
 
-from .database import EventType, HostPosition, connect, data_format
-from .util import PositionError
+from ergometer.database import EventType, HostPosition, connect, data_format
+from ergometer.util import PositionError
 
 now = datetime(year=2020, month=5, day=16)
 sample_host = "abcdefghi"

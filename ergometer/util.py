@@ -38,7 +38,7 @@ def init():
         "log": 10,
         "port": 8888,
         "source_root": getattr(
-            sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__))
+            sys, "_MEIPASS", os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         ),
         "verbose": False,
     }

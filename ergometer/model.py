@@ -4,10 +4,10 @@ from collections import deque
 from datetime import datetime
 from threading import Thread
 
-from .data_processor import run_loop
-from .database import EventType, connect, data_format
-from .time import is_on_day
-from .util import log
+from ergometer.data_processor import run_loop
+from ergometer.database import EventType, connect, data_format
+from ergometer.time import is_on_day
+from ergometer.util import log
 
 
 class Model:

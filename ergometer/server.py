@@ -1,11 +1,10 @@
 import asyncio
 import sys
 
+import ergometer.messages as m
 import websockets
-
-from . import messages as m
-from .data_processor import FileManager
-from .util import FatalError, async_log_exceptions, init, log
+from ergometer.data_processor import FileManager
+from ergometer.util import FatalError, async_log_exceptions, init, log
 
 
 # Handles "read" calls. Sends an unending stream of data to a client.
@@ -46,7 +45,8 @@ def client_handler(file_manager):
     return handle_client
 
 
-async def main():
+@async_log_exceptions
+async def serve():
     port = init()["port"]
     file_manager = FileManager("broker")
     log.debug(f"listening on port {port}")
@@ -55,4 +55,5 @@ async def main():
     log.info("Ergometer exited")
 
 
-asyncio.run(main())
+def main():
+    asyncio.run(serve())

@@ -5,12 +5,14 @@ from functools import total_ordering
 from itertools import chain, dropwhile, islice, repeat
 from time import time_ns
 
-from sqlalchemy import Boolean, Column, Integer, String, create_engine, event, func
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-
-from .time import day_start_of, imprecise_clock, in_seconds, is_on_day, max_time
-from .util import (
+from ergometer.time import (
+    day_start_of,
+    imprecise_clock,
+    in_seconds,
+    is_on_day,
+    max_time,
+)
+from ergometer.util import (
     Interval,
     PositionError,
     async_log_exceptions,
@@ -20,6 +22,9 @@ from .util import (
     retry_on,
     takeuntil_inclusive,
 )
+from sqlalchemy import Boolean, Column, Integer, String, create_engine, event, func
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
 
 
 class connect(sessionmaker):

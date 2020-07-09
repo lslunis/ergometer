@@ -3,10 +3,9 @@ from random import randint
 
 import wx
 import wx.adv
-
-from .model import Model
-from .time import precise_clock
-from .util import init, log, log_exceptions
+from ergometer.model import Model
+from ergometer.time import precise_clock
+from ergometer.util import init, log, log_exceptions
 
 Color = wx.Colour
 
@@ -148,7 +147,3 @@ def main():
     hz = 2
     timer.Start(int(1000 / hz))
     app.MainLoop()
-
-
-if __name__ == "__main__":
-    main()

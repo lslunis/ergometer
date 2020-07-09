@@ -13,10 +13,12 @@ bin_dir = os.path.join("venv", "Scripts" if is_windows else "bin")
 def mtime(path):
     return os.path.exists(path) and os.stat(path).st_mtime_ns
 
+
 def make_venv(name, *args):
     path = os.path.join("venv", name)
     if not os.path.exists(os.path.join(path, "pyvenv.cfg")):
         venv.create(path, with_pip=True)
+
 
 def build(*args):
     if is_windows and mtime("activity_monitor.exe") < mtime("activity_monitor.cpp"):

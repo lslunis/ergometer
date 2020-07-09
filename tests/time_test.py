@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from .time import day_start_of, in_seconds
+from ergometer.time import day_start_of, in_seconds
 
 
 def test_day_of():

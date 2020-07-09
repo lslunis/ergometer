@@ -1,4 +1,4 @@
-from .util import Interval, pairwise, takeuntil_inclusive
+from ergometer.util import Interval, pairwise, takeuntil_inclusive
 
 
 def test_interval_overlaps():

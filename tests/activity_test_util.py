@@ -1,5 +1,5 @@
-from .database import ActivityEdge, min_pause
-from .time import max_time
+from ergometer.database import ActivityEdge, min_pause
+from ergometer.time import max_time
 
 
 def add_activity(session, *times):

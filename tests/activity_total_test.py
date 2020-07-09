@@ -1,8 +1,8 @@
 from datetime import datetime
 
-from .activity_test_util import add_activity
-from .database import ActivityEdge, connect
-from .time import in_seconds
+from ergometer.activity_test_util import add_activity
+from ergometer.database import ActivityEdge, connect
+from ergometer.time import in_seconds
 
 
 def iso(s):
