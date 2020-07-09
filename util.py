@@ -34,6 +34,7 @@ def init():
     config = {
         "button_count_ignore_list": [],
         "data": "",
+        "generate_activity": False,
         "log": 10,
         "port": 8888,
         "source_root": getattr(
