@@ -1,5 +1,5 @@
-from ergometer.activity_test_util import add_activity
 from ergometer.database import ActivityEdge, connect
+from ergometer.tests.activity_test_util import add_activity
 
 
 def test_no_rest():

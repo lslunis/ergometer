@@ -1,7 +1,7 @@
 from datetime import datetime
 
-from ergometer.activity_test_util import add_activity
 from ergometer.database import ActivityEdge, connect
+from ergometer.tests.activity_test_util import add_activity
 from ergometer.time import in_seconds
 
 

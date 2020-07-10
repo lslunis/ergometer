@@ -56,4 +56,7 @@ async def serve():
 
 
 def main():
-    asyncio.run(serve())
+    try:
+        asyncio.run(serve())
+    except KeyboardInterrupt:
+        ...

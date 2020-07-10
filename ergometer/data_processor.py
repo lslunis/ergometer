@@ -311,16 +311,18 @@ async def activity_monitor(push_local_event, generate_activity, *args):
 
 @asynccontextmanager
 async def exec(args):
+    subprocess = None
     try:
         subprocess = await asyncio.create_subprocess_exec(
             *map(str, args), stdout=asyncio.subprocess.PIPE
         )
         yield subprocess.stdout
     finally:
-        log.debug("closing subprocess")
-        subprocess.terminate()
-        await subprocess.wait()
-        log.debug("closed subprocess")
+        if subprocess:
+            log.debug("closing subprocess")
+            subprocess.terminate()
+            await subprocess.wait()
+            log.debug("closed subprocess")
 
 
 def make_event(time):

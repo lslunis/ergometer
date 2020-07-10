@@ -42,8 +42,10 @@ def init():
         ),
         "verbose": False,
     }
-    with open(os.path.join(config["source_root"], "config.json")) as f:
-        config.update(json.load(f))
+    config_path = os.path.join(config["source_root"], "config.json")
+    if os.path.exists(config_path):
+        with open(config_path) as f:
+            config.update(json.load(f))
     p = argparse.ArgumentParser(argument_default=argparse.SUPPRESS)
     p.add_argument("--button_count_ignore_list")
     p.add_argument("--data")

@@ -1,5 +1,5 @@
-from ergometer.activity_test_util import add_activity, assert_activity
 from ergometer.database import ActivityUpdater, connect
+from ergometer.tests.activity_test_util import add_activity, assert_activity
 
 
 def test_split_empty():
