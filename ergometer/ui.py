@@ -3,6 +3,7 @@ from random import randint
 
 import wx
 import wx.adv
+from ergometer.database import setting_types
 from ergometer.model import Model
 from ergometer.time import precise_clock
 from ergometer.util import init, log, log_exceptions
@@ -53,7 +54,15 @@ class Tray(wx.adv.TaskBarIcon):
         self.top.SetTransparent(randint(0, 254))
 
 
+settings_shown = False
+
+
 def show_settings(settings, push_local_event, top):
+    global settings_shown
+    if settings_shown:
+        return
+    settings_shown = True
+
     frame = wx.Frame(top)
     sizer = wx.FlexGridSizer(3, 16, 16)
     frame.SetSizer(sizer)
@@ -63,8 +72,8 @@ def show_settings(settings, push_local_event, top):
         sizer.Add(label)
 
     controls = []
-    for name, value in settings.items():
-        add_label(name.capitalize().replace("_", " "))
+    for type, value in settings:
+        add_label(type.name.capitalize().replace("_", " "))
         add_label(str(value))
 
         field = wx.TextCtrl(frame)
@@ -112,12 +121,18 @@ def show_settings(settings, push_local_event, top):
     frame.Show()
 
 
+def get_settings(metrics):
+    return [(type, metrics[type.name]) for type in setting_types]
+
+
 @log_exceptions
 def main():
     @log_exceptions
     def draw(*args):
         metrics = model.metrics_at(precise_clock().timestamp())
-        # log.debug(metrics)
+        if metrics is None:
+            return
+        show_settings(get_settings(metrics), model.push_local_event, top)
 
     @log_exceptions
     def exit(*args):
@@ -138,8 +153,6 @@ def main():
     top.Show()
     tray = Tray(top)
     model = Model(config, threaded=True)
-    settings = {"daily_target": 1800, "session_target": 300}
-    show_settings(settings, model.push_local_event, top)
     timer = wx.Timer(top)
     top.Bind(wx.EVT_TIMER, draw, timer)
     top.Bind(wx.EVT_CLOSE, exit)

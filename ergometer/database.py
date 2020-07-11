@@ -22,7 +22,7 @@ from ergometer.util import (
     retry_on,
     takeuntil_inclusive,
 )
-from sqlalchemy import Boolean, Column, Integer, String, create_engine, event, func
+from sqlalchemy import Boolean, Column, Float, Integer, String, create_engine, event, func
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
@@ -78,7 +78,7 @@ class HostPosition(Base):
 class Setting(Base):
     __tablename__ = "settings"
     id = Column(Integer, primary_key=True)
-    value = Column(Integer, nullable=False)
+    value = Column(Float, nullable=False)
     time = Column(Integer, nullable=False)
 
     @property
@@ -254,6 +254,13 @@ class EventType(Enum):
     daily_target = (1, in_seconds(hours=8))
     session_target = (2, in_seconds(hours=1))
     rest_target = (3, in_seconds(minutes=5))
+    daily_notice = (4, in_seconds(minutes=2))
+    session_notice = (5, in_seconds(minutes=2))
+    rest_notice = (6, in_seconds(minutes=2))
+    fade_min = (7, 0.1)
+    fade_max = (8, 0.9)
+    unfade_multiplier = (9, 1)
+    unfade_rate = (10, 1)
 
     def __new__(cls, value, default=None):
         self = object.__new__(cls)
@@ -278,7 +285,7 @@ class EventType(Enum):
 
 setting_types = [t for t in EventType.__members__.values() if t.is_setting]
 
-data_format = "<BxxxIQ"
+data_format = "<BxxxfQ"
 
 
 @async_log_exceptions
