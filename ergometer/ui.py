@@ -1,12 +1,13 @@
 import os
+import struct
 from random import randint
 
 import wx
 import wx.adv
 
-from ergometer.database import setting_types
+from ergometer.database import data_format, setting_types
 from ergometer.model import Model
-from ergometer.time import precise_clock, in_seconds, imprecise_clock
+from ergometer.time import imprecise_clock, in_seconds, precise_clock
 from ergometer.util import init, log, log_exceptions
 
 Color = wx.Colour
@@ -128,7 +129,6 @@ def show_settings(settings, push_local_event, top):
 
         return None if has_errors else typed_values
 
-
     def save(*args):
         typed_values = get_typed_values()
         if save.waiting:
@@ -139,7 +139,9 @@ def show_settings(settings, push_local_event, top):
             for ctrl in controls:
                 ctrl.Disable()
         else:
-            log.debug("save")
+            time = int(imprecise_clock().timestamp())
+            for type, value in typed_values:
+                push_local_event(struct.pack(data_format, type.value, value, time))
 
     def wait(*args):
         if save.waiting > 0:
