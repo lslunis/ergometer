@@ -6,7 +6,7 @@ import wx.adv
 
 from ergometer.database import setting_types
 from ergometer.model import Model
-from ergometer.time import precise_clock
+from ergometer.time import precise_clock, in_seconds, imprecise_clock
 from ergometer.util import init, log, log_exceptions
 
 Color = wx.Colour
@@ -58,6 +58,15 @@ class Tray(wx.adv.TaskBarIcon):
 settings_shown = False
 
 
+def is_duration(type):
+    return type.name.rpartition("_")[-1] in ["notice", "target"]
+
+
+def in_seconds_using_postfix(value, postfix):
+    unit = dict(h="hours", m="minutes", s="seconds")[postfix]
+    return in_seconds(**{unit: value})
+
+
 def show_settings(settings, push_local_event, top):
     global settings_shown
     if settings_shown:
@@ -73,7 +82,7 @@ def show_settings(settings, push_local_event, top):
         sizer.Add(label)
 
     controls = []
-    fields = []
+    typed_fields = []
     for type, value in settings:
         add_label(type.name.capitalize().replace("_", " "))
         add_label(str(value))
@@ -81,10 +90,11 @@ def show_settings(settings, push_local_event, top):
         field = wx.TextCtrl(frame)
         sizer.Add(field)
         controls.append(field)
-        fields.append((type, field))
+        typed_fields.append((type, field))
 
-    def get_values():
+    def get_typed_values():
         has_errors = False
+        typed_values = []
 
         def error_actions(field):
             field.SetBackgroundColour("pink")
@@ -92,13 +102,13 @@ def show_settings(settings, push_local_event, top):
             nonlocal has_errors
             has_errors = True
 
-        for type, field in fields:
+        for type, field in typed_fields:
             field.SetBackgroundColour(wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOW))
             field.Refresh()
             string = field.GetValue()
             if not string:
                 continue
-            if type.name.rpartition("_")[-1] in ["notice", "target"]:
+            if is_duration(type):
                 postfix = string[-1].lower()
                 if postfix not in "hms":
                     error_actions(field)
@@ -108,14 +118,22 @@ def show_settings(settings, push_local_event, top):
                 postfix = None
 
             try:
-                val = float(string)
+                value = float(string)
             except ValueError:
                 error_actions(field)
                 continue
+            if postfix:
+                value = in_seconds_using_postfix(value, postfix)
+            typed_values.append((type, value))
+
+        return None if has_errors else typed_values
+
 
     def save(*args):
+        typed_values = get_typed_values()
         if save.waiting:
-            get_values()
+            if not typed_values:
+                return
             wait()
             timer.Start(1000)
             for ctrl in controls:
