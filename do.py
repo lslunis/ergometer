@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.7
 
 import argparse
 import math
@@ -60,7 +60,7 @@ def fix():
 
 
 def run(name, args):
-    python = get_bin_path(get_venv_name(name), "pythonw" if is_windows else "python3")
+    python = get_bin_path(get_venv_name(name), "pythonw" if is_windows else "python3.7")
     execute([python, f"ergometer_{name}.py", *args])
 
 
