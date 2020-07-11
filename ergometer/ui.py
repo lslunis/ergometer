@@ -63,9 +63,26 @@ def is_duration(type):
     return type.name.rpartition("_")[-1] in ["notice", "target"]
 
 
+postfix_to_unit = dict(h="hours", m="minutes", s="seconds")
+
+
+def format_duration(value):
+    return min(
+        [
+            f"{from_seconds_using_postfix(value, postfix):.9g}{postfix}"
+            for postfix in postfix_to_unit
+        ],
+        key=len,
+    )
+
+
 def in_seconds_using_postfix(value, postfix):
-    unit = dict(h="hours", m="minutes", s="seconds")[postfix]
+    unit = postfix_to_unit[postfix]
     return in_seconds(**{unit: value})
+
+
+def from_seconds_using_postfix(value, postfix):
+    return value / in_seconds_using_postfix(1, postfix)
 
 
 def show_settings(settings, push_local_event, top):
@@ -86,7 +103,7 @@ def show_settings(settings, push_local_event, top):
     typed_fields = []
     for type, value in settings:
         add_label(type.name.capitalize().replace("_", " "))
-        add_label(str(value))
+        add_label(format_duration(value) if is_duration(type) else str(value))
 
         field = wx.TextCtrl(frame)
         sizer.Add(field)
@@ -111,7 +128,7 @@ def show_settings(settings, push_local_event, top):
                 continue
             if is_duration(type):
                 postfix = string[-1].lower()
-                if postfix not in "hms":
+                if postfix not in postfix_to_unit:
                     error_actions(field)
                     continue
                 string = string[:-1]
