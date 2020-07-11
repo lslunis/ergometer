@@ -93,10 +93,7 @@ def main():
 
     kw = vars(parser.parse_args())
 
-    if (
-        kw.get("name") == "ui"
-        and not is_windows
-    ):
+    if kw.get("name") == "ui" and not is_windows:
         try:
             if not execute(["python.exe", "do.py", *sys.argv[1:]]).returncode:
                 return  # succeeded in running the Windows version instead

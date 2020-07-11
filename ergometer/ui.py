@@ -3,6 +3,7 @@ from random import randint
 
 import wx
 import wx.adv
+
 from ergometer.database import setting_types
 from ergometer.model import Model
 from ergometer.time import precise_clock
@@ -72,6 +73,7 @@ def show_settings(settings, push_local_event, top):
         sizer.Add(label)
 
     controls = []
+    fields = []
     for type, value in settings:
         add_label(type.name.capitalize().replace("_", " "))
         add_label(str(value))
@@ -79,9 +81,41 @@ def show_settings(settings, push_local_event, top):
         field = wx.TextCtrl(frame)
         sizer.Add(field)
         controls.append(field)
+        fields.append((type, field))
+
+    def get_values():
+        has_errors = False
+
+        def error_actions(field):
+            field.SetBackgroundColour("pink")
+            field.Refresh()
+            nonlocal has_errors
+            has_errors = True
+
+        for type, field in fields:
+            field.SetBackgroundColour(wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOW))
+            field.Refresh()
+            string = field.GetValue()
+            if not string:
+                continue
+            if type.name.rpartition("_")[-1] in ["notice", "target"]:
+                postfix = string[-1].lower()
+                if postfix not in "hms":
+                    error_actions(field)
+                    continue
+                string = string[:-1]
+            else:
+                postfix = None
+
+            try:
+                val = float(string)
+            except ValueError:
+                error_actions(field)
+                continue
 
     def save(*args):
         if save.waiting:
+            get_values()
             wait()
             timer.Start(1000)
             for ctrl in controls:

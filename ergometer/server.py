@@ -1,8 +1,9 @@
 import asyncio
 import sys
 
-import ergometer.messages as m
 import websockets
+
+from ergometer import messages as m
 from ergometer.data_processor import FileManager
 from ergometer.util import FatalError, async_log_exceptions, init, log
 

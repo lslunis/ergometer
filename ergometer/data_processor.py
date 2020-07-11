@@ -2,15 +2,16 @@ import asyncio
 import asyncio.subprocess
 import glob
 import os
-import os.path as path
 import struct
 import sys
 import uuid
 from contextlib import asynccontextmanager
+from os import path as path
 from time import time_ns
 
-import ergometer.messages as m
 import websockets
+
+from ergometer import messages as m
 from ergometer.database import EventType, data_format, database_updater
 from ergometer.time import imprecise_clock
 from ergometer.util import (

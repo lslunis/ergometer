@@ -5,6 +5,19 @@ from functools import total_ordering
 from itertools import chain, dropwhile, islice, repeat
 from time import time_ns
 
+from sqlalchemy import (
+    Boolean,
+    Column,
+    Float,
+    Integer,
+    String,
+    create_engine,
+    event,
+    func,
+)
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+
 from ergometer.time import (
     day_start_of,
     imprecise_clock,
@@ -22,9 +35,6 @@ from ergometer.util import (
     retry_on,
     takeuntil_inclusive,
 )
-from sqlalchemy import Boolean, Column, Float, Integer, String, create_engine, event, func
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
 
 
 class connect(sessionmaker):
