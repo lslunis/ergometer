@@ -4,10 +4,11 @@ import json
 import logging
 import logging.handlers
 import os
+import re
 import sys
-from urllib.parse import ParseResult, urlunparse
 from collections import namedtuple
 from functools import wraps
+from urllib.parse import ParseResult, urlunparse
 
 log = logging.getLogger("ergometer")
 
@@ -20,9 +21,9 @@ class PositionError(Exception):
     ...
 
 
-def die_unless(cond, message):
+def die_unless(cond, message=""):
     if not cond:
-        raise Exception(message)
+        raise FatalError(message)
 
 
 class Interval(namedtuple("Interval", ["start", "end"])):
@@ -36,10 +37,9 @@ def init():
         "button_count_ignore_list": [],
         "data": "",
         "generate_activity": False,
+        "insecure": False,
         "log": 10,
-        "port": 8888,
-        "username": "",
-        "password": "",
+        "port": 5187,
         "source_root": getattr(
             sys, "_MEIPASS", os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         ),
@@ -50,23 +50,17 @@ def init():
         with open(config_path) as f:
             config.update(json.load(f))
     p = argparse.ArgumentParser(argument_default=argparse.SUPPRESS)
-    p.add_argument("--button_count_ignore_list")
+    p.add_argument("--button_count_ignore_list", nargs="+", type=int)
     p.add_argument("--data")
     p.add_argument("--generate_activity", action="store_true")
+    p.add_argument("--insecure", action="store_true")
     p.add_argument("--log", type=int)
     p.add_argument("--port", type=int)
-    p.add_argument("--username")
-    p.add_argument("--password")
     p.add_argument("--server")
     p.add_argument("--verbose", action="store_true")
     config.update(vars(p.parse_args()))
-    
-    def make_url(scheme, hostname, port, username, password, **unused):
-        if username or password:
-            return f"{scheme}://{username}:{password}@{hostname}:{port}"
-        return f"{scheme}://{hostname}:{port}"
-
-    config.setdefault("server", make_url(scheme="ws", hostname="localhost", **config))
+    config.setdefault("server", f"ws://localhost:{config['port']}")
+    die_unless(not re.match(r"ws:.*@", config["server"]) or config["insecure"])
 
     storage_root = os.path.join(config["source_root"], "data", config["data"])
     os.makedirs(storage_root, exist_ok=True)
