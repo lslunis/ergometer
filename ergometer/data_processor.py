@@ -300,13 +300,13 @@ async def activity_monitor(push_local_event, generate_activity, *args):
     log.debug("Starting activity_monitor")
     if generate_activity:
         while True:
-            push_local_event(make_event(int(imprecise_clock().timestamp())))
+            push_local_event(make_action(int(imprecise_clock().timestamp())))
             await asyncio.sleep(1)
     elif os.name == "nt":
         async with exec(args) as out:
             while True:
                 time = int(await out.readuntil())
-                push_local_event(make_event(time))
+                push_local_event(make_action(time))
 
 
 @asynccontextmanager
@@ -325,7 +325,7 @@ async def exec(args):
             log.debug("closed subprocess")
 
 
-def make_event(time):
+def make_action(time):
     return struct.pack(data_format, EventType.action.value, 1, time - 1)
 
 
