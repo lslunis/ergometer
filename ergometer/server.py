@@ -50,7 +50,17 @@ async def serve():
     port = init()["port"]
     file_manager = FileManager("broker")
     log.debug(f"listening on port {port}")
-    server = await websockets.serve(client_handler(file_manager), port=port)
+    server = await websockets.serve(
+        client_handler(file_manager),
+        port=port,
+        create_protocol=websockets.basic_auth_protocol_factory(
+            realm="lukeshands",
+            credentials=(
+                "luke",
+                "hunter2",
+            ),
+        ),
+    )
     await server.wait_closed()
     log.info("Ergometer exited")
 

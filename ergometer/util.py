@@ -5,6 +5,7 @@ import logging
 import logging.handlers
 import os
 import sys
+from urllib.parse import ParseResult, urlunparse
 from collections import namedtuple
 from functools import wraps
 
@@ -37,6 +38,8 @@ def init():
         "generate_activity": False,
         "log": 10,
         "port": 8888,
+        "username": "",
+        "password": "",
         "source_root": getattr(
             sys, "_MEIPASS", os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         ),
@@ -52,10 +55,18 @@ def init():
     p.add_argument("--generate_activity", action="store_true")
     p.add_argument("--log", type=int)
     p.add_argument("--port", type=int)
+    p.add_argument("--username")
+    p.add_argument("--password")
     p.add_argument("--server")
     p.add_argument("--verbose", action="store_true")
     config.update(vars(p.parse_args()))
-    config.setdefault("server", "ws://localhost:{port}".format(**config))
+    
+    def make_url(scheme, hostname, port, username, password, **unused):
+        if username or password:
+            return f"{scheme}://{username}:{password}@{hostname}:{port}"
+        return f"{scheme}://{hostname}:{port}"
+
+    config.setdefault("server", make_url(scheme="ws", hostname="localhost", **config))
 
     storage_root = os.path.join(config["source_root"], "data", config["data"])
     os.makedirs(storage_root, exist_ok=True)
