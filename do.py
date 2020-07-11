@@ -96,9 +96,12 @@ def main():
     if (
         kw.get("name") == "ui"
         and not is_windows
-        and not execute(["python.exe", "do.py", *sys.argv[1:]]).returncode
     ):
-        return  # succeeded in running the Windows version instead
+        try:
+            if not execute(["python.exe", "do.py", *sys.argv[1:]]).returncode:
+                return  # succeeded in running the Windows version instead
+        except FileNotFoundError:
+            ...
 
     try:
         kw.pop("command")(**kw)
