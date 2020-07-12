@@ -1,10 +1,10 @@
 import os
 import struct
+from math import isfinite
 from random import randint
 
 import wx
 import wx.adv
-
 from ergometer.database import data_format, setting_types
 from ergometer.model import Model
 from ergometer.time import imprecise_clock, in_seconds, precise_clock
@@ -93,7 +93,6 @@ def show_settings(settings, push_local_event, top):
 
     frame = wx.Frame(top)
     sizer = wx.FlexGridSizer(3, 16, 16)
-    frame.SetSizer(sizer)
 
     def add_label(text):
         label = wx.StaticText(frame, label=text)
@@ -138,6 +137,8 @@ def show_settings(settings, push_local_event, top):
             try:
                 value = float(string)
             except ValueError:
+                value = None
+            if not (value and isfinite(value) and value > 0):
                 error_actions(field)
                 continue
             if postfix:
@@ -159,6 +160,7 @@ def show_settings(settings, push_local_event, top):
             time = int(imprecise_clock().timestamp())
             for type, value in typed_values:
                 push_local_event(struct.pack(data_format, type.value, value, time))
+            frame.Close()
 
     def wait(*args):
         if save.waiting > 0:
@@ -169,7 +171,7 @@ def show_settings(settings, push_local_event, top):
             save_button.Enable()
             save_button.SetLabel("Save")
 
-    def cancel(*args):
+    def revise(*args):
         save.waiting = 5
         timer.Stop()
         save_button.SetLabel("Preview")
@@ -185,10 +187,11 @@ def show_settings(settings, push_local_event, top):
     sizer.Add(save_button)
     controls.append(save_button)
 
-    cancel_button = wx.Button(frame, label="Cancel")
-    cancel_button.Bind(wx.EVT_BUTTON, cancel)
-    sizer.Add(cancel_button)
+    revise_button = wx.Button(frame, label="Revise")
+    revise_button.Bind(wx.EVT_BUTTON, revise)
+    sizer.Add(revise_button)
 
+    frame.SetSizerAndFit(sizer)
     frame.Show()
 
 
