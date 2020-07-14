@@ -1,5 +1,5 @@
 from ergometer.database import ActivityEdge, min_pause
-from ergometer.time import max_time
+from ergometer.time import max_time, min_time
 
 
 def add_activity(session, *times):
@@ -13,7 +13,7 @@ def assert_activity(session, *times):
 
 def activity_from_times(times):
     assert len(times) % 2 == 0
-    times = [0, *times, max_time]
+    times = [min_time, *times, max_time]
     for i in range(0, len(times), 2):
         pause_start, pause_end = times[i : i + 2]
         assert pause_end - pause_start >= min_pause

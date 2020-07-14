@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from math import inf
 
 
 def day_start_of(dt):
@@ -24,9 +25,8 @@ def precise_clock():
     return datetime.now().astimezone()
 
 
-# SQLite uses variable length integers, so limit the size that timestamps will take up
-# https://sqlite.org/src4/doc/trunk/www/varint.wiki
-max_time = 2 ** 40 - 1
+min_time = -inf
+max_time = inf
 
 
 def in_seconds(**kw):

@@ -7,7 +7,13 @@ import wx
 import wx.adv
 from ergometer.database import data_format, setting_types
 from ergometer.model import Model
-from ergometer.time import day_start_of, imprecise_clock, in_seconds, precise_clock
+from ergometer.time import (
+    day_start_of,
+    imprecise_clock,
+    in_seconds,
+    min_time,
+    precise_clock,
+)
 from ergometer.util import clip, init, log, log_exceptions
 
 
@@ -18,7 +24,7 @@ class Tray(wx.adv.TaskBarIcon):
         self.top = top
         self.model = model
         self.history_step = "1d"
-        self.last_set_icon = 0
+        self.last_set_icon = min_time
 
     def CreatePopupMenu(self):
         menu = wx.Menu()
@@ -85,7 +91,7 @@ class Tray(wx.adv.TaskBarIcon):
 
         button_row = wx.BoxSizer()
         field = wx.TextCtrl(frame, style=wx.TE_PROCESS_ENTER)
-        field.Bind(wx.EVT_TEXT_ENTER ,view)
+        field.Bind(wx.EVT_TEXT_ENTER, view)
         field.SetValue(self.history_step)
         button_row.Add(field)
         view_button = wx.Button(frame, label="View")

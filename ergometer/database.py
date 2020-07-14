@@ -11,6 +11,7 @@ from ergometer.time import (
     in_seconds,
     is_on_day,
     max_time,
+    min_time,
 )
 from ergometer.util import (
     Interval,
@@ -88,7 +89,7 @@ class Setting(Base):
     __tablename__ = "settings"
     id = Column(Integer, primary_key=True)
     value = Column(Float, nullable=False)
-    time = Column(Integer, nullable=False)
+    time = Column(Float, nullable=False)
 
     @property
     def name(self):
@@ -101,7 +102,7 @@ class Setting(Base):
 
 class ActivityEdge(Base):
     __tablename__ = "activity_edges"
-    time = Column(Integer, primary_key=True)
+    time = Column(Float, primary_key=True)
     rising = Column(Boolean, nullable=False)
 
     def __eq__(self, other):
@@ -142,7 +143,7 @@ class ActivityEdge(Base):
             last_rest, prior_rest = islice(rests, 2)
             return prior_rest.end
         except ValueError:
-            return 0
+            return min_time
 
     @staticmethod
     def rest_start(session):
@@ -175,7 +176,7 @@ def get_overlapping_intervals(edges, start, end, as_pauses=False):
 @event.listens_for(ActivityEdge.__table__, "after_create")
 def do_after_create(target, connection, **kwds):
     session = sessionmaker()(bind=connection)
-    session.add(ActivityEdge(time=0, rising=False))
+    session.add(ActivityEdge(time=min_time, rising=False))
     session.add(ActivityEdge(time=max_time, rising=True))
     session.commit()
 
@@ -224,18 +225,20 @@ class ActivityUpdater:
         total = 0
 
         for pause in pauses:
-            total += pause.end.time - pause.start.time
+            total += min(activity.end.time, pause.end.time) - max(
+                activity.start.time, pause.start.time
+            )
             for x in ("start", "end"):
                 activity_edge = getattr(activity, x)
                 pause_edge = getattr(pause, x)
                 sign = 1 if activity_edge.rising else -1
                 d = sign * (activity_edge.time - pause_edge.time)
                 if d >= min_pause:
-                    total -= d
                     self.boxed_edges.append(ActivityEdgeOrderedByTime(activity_edge))
                     self.session.add(activity_edge)
                 else:
                     if d > 0:
+                        total += d
                         bound_deleted[x] = True
                     self.session.delete(pause_edge)
 
@@ -295,14 +298,14 @@ class EventType(Enum):
         setting = session.query(Setting).get(id)
         exists = setting is not None
         if not exists:
-            setting = Setting(id=id, value=self.default, time=0)
+            setting = Setting(id=id, value=self.default, time=min_time)
             session.add(setting)
         return setting
 
 
 setting_types = [t for t in EventType.__members__.values() if t.is_setting]
 
-data_format = "<BxxxfQ"
+data_format = "<ifd"
 
 
 @async_log_exceptions
@@ -345,7 +348,7 @@ def update_database(cache, update_cache, now, session, host, position, data):
         daily_total = None
     activity_updater = ActivityUpdater(session)
     min_activity_start = max_time
-    max_activity_end = 0
+    max_activity_end = min_time
 
     for event_type_id, value, time in struct.iter_unpack(data_format, data):
         event_type = EventType(event_type_id)
