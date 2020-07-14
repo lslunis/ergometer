@@ -21,6 +21,8 @@ from ergometer.util import (
     retry_on_iter,
 )
 
+min_sleep = 0.016 # on Windows, sleep below this value returns immediately
+
 # trim at startup
 # mark irrecoverable data
 
@@ -52,7 +54,7 @@ async def local_event_writer(host, pop_local_event, file_manager):
             ...
         if events:
             file_manager.write(host, events)
-        await asyncio.sleep(0.01)
+        await asyncio.sleep(min_sleep)
 
 
 # Read all changes from "broker" for other hosts and write them using
@@ -354,7 +356,7 @@ async def data_worker(model):
     ]
 
     while not model.exiting:
-        await asyncio.sleep(0.01)
+        await asyncio.sleep(min_sleep)
     log.debug("canceling data tasks")
     for task in tasks:
         task.cancel()

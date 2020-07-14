@@ -35,13 +35,17 @@ class Model:
     def pop_local_event(self):
         return self._local_events.popleft()
 
+    @property
+    def ready(self):
+        return bool(self._cache)
+
     def update_cache(self, delta):
         log.info(f"update_cache {delta}")
         self._cache = {**self._cache, **delta}
         return self._cache
 
     def metrics_at(self, time):
-        if not self._cache:
+        if not self.ready:
             return None
         m = {**self._cache}
         m["daily_value"] = m["daily_total"] if is_on_day(time, m["day_start"]) else 0
@@ -51,8 +55,13 @@ class Model:
         )
         return m
 
-    def activity_running_total(self, start, end):
-        return
+    def activity_totals(self, start, step, limit=1):
+        for i in range(limit):
+            end = start + step
+            total = 0
+            yield start, total
+            start = end
+
 
     def exit(self):
         log.debug("data loop exiting")

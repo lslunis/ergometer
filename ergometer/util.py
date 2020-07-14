@@ -3,6 +3,7 @@ import asyncio
 import json
 import logging
 import logging.handlers
+import math
 import os
 import re
 import sys
@@ -19,6 +20,10 @@ class FatalError(Exception):
 
 class PositionError(Exception):
     ...
+
+
+def clip(value, low=-math.inf, high=math.inf):
+    return max(low, min(high, value))
 
 
 def die_unless(cond, message=""):
