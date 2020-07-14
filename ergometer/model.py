@@ -5,7 +5,7 @@ from datetime import datetime
 from threading import Thread
 
 from ergometer.data_processor import run_loop
-from ergometer.database import EventType, connect, data_format
+from ergometer.database import ActivityEdge, EventType, connect, data_format
 from ergometer.time import is_on_day
 from ergometer.util import log
 
@@ -55,13 +55,8 @@ class Model:
         )
         return m
 
-    def activity_totals(self, start, step, limit=1):
-        for i in range(limit):
-            end = start + step
-            total = 0
-            yield start, total
-            start = end
-
+    def activity_totals(self, *args):
+        return ActivityEdge.activity_totals(self.Session, *args)
 
     def exit(self):
         log.debug("data loop exiting")

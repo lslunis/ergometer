@@ -116,6 +116,14 @@ class ActivityEdge(Base):
         return f"<ActivityEdge {self.time} {arrow}>"
 
     @staticmethod
+    def activity_totals(session, start, step, limit=1):
+        for i in range(limit):
+            end = start + step
+            total = 0
+            yield start, total
+            start = end
+
+    @staticmethod
     def activity_total(session, start, end):
         edges = get_edges_including_bounds(session, start, end)
         activities = get_overlapping_intervals(edges, start, end)

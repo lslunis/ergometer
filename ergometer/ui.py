@@ -1,13 +1,13 @@
 import os
 import struct
 from datetime import datetime
-from math import isfinite
+from math import ceil, isfinite
 
 import wx
 import wx.adv
 from ergometer.database import data_format, setting_types
 from ergometer.model import Model
-from ergometer.time import imprecise_clock, in_seconds, precise_clock
+from ergometer.time import day_start_of, imprecise_clock, in_seconds, precise_clock
 from ergometer.util import clip, init, log, log_exceptions
 
 
@@ -51,14 +51,17 @@ class Tray(wx.adv.TaskBarIcon):
             label_rows.append(labels)
             for j in range(2):
                 label = wx.StaticText(frame)
-                label.SetFont(wx.Font(10,wx.FONTFAMILY_TELETYPE,wx.NORMAL,wx.NORMAL, faceName='Consolas'))
+                label.SetFont(
+                    wx.Font(
+                        10,
+                        wx.FONTFAMILY_TELETYPE,
+                        wx.NORMAL,
+                        wx.NORMAL,
+                        faceName="Consolas",
+                    )
+                )
                 grid.Add(label, wx.ALIGN_RIGHT if j == 1 else 0)
                 labels.append(label)
-
-        button_row = wx.BoxSizer()
-        field = wx.TextCtrl(frame)
-        field.SetValue(self.history_step)
-        button_row.Add(field)
 
         def view(*unused):
             try:
@@ -68,7 +71,9 @@ class Tray(wx.adv.TaskBarIcon):
             except ValueError:
                 return
             self.history_step = field.GetValue()
-            end = precise_clock().timestamp()
+            now_dt = precise_clock()
+            day_end = day_start_of(now_dt) + in_seconds(days=1)
+            end = ceil((now_dt.timestamp() - day_end) / step) * step + day_end
             start = end - step * limit
             for labels, time_total in zip(
                 label_rows, self.model.activity_totals(start, step, limit)
@@ -78,6 +83,11 @@ class Tray(wx.adv.TaskBarIcon):
                 time_label.SetLabel(format_time(time))
                 total_label.SetLabel(format_in_minutes(total))
 
+        button_row = wx.BoxSizer()
+        field = wx.TextCtrl(frame, style=wx.TE_PROCESS_ENTER)
+        field.Bind(wx.EVT_TEXT_ENTER ,view)
+        field.SetValue(self.history_step)
+        button_row.Add(field)
         view_button = wx.Button(frame, label="View")
         view_button.Bind(wx.EVT_BUTTON, view)
         button_row.Add(view_button)
@@ -182,6 +192,7 @@ class Tray(wx.adv.TaskBarIcon):
         )
         frame.SetSizerAndFit(column)
         show_in_corner(frame)
+
 
 def show_in_corner(frame):
     dx, dy, dw, dh = wx.ClientDisplayRect()

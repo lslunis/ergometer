@@ -21,7 +21,7 @@ from ergometer.util import (
     retry_on_iter,
 )
 
-min_sleep = 0.016 # on Windows, sleep below this value returns immediately
+min_sleep = 0.016  # on Windows, sleep below this value returns immediately
 
 # trim at startup
 # mark irrecoverable data
