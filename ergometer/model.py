@@ -3,6 +3,7 @@ import sys
 from collections import deque
 from datetime import datetime
 from threading import Thread
+from time import time_ns
 
 from ergometer.data_processor import run_loop
 from ergometer.database import ActivityEdge, EventType, connect, data_format
@@ -56,7 +57,12 @@ class Model:
         return m
 
     def activity_totals(self, *args):
-        return ActivityEdge.activity_totals(self.Session, *args)
+        start = time_ns()
+        session = self.Session()
+        yield from ActivityEdge.activity_totals(session, *args)
+        session.commit()
+        elapsed = time_ns() - start
+        log.debug(f"yielded all activity totals in {elapsed/1e9:.3f}s")
 
     def exit(self):
         log.debug("data loop exiting")

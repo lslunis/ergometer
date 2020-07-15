@@ -1,5 +1,6 @@
 import struct
 from bisect import bisect_left, bisect_right
+from collections import deque
 from enum import Enum
 from functools import total_ordering
 from itertools import chain, dropwhile, islice, repeat
@@ -17,11 +18,13 @@ from ergometer.util import (
     Interval,
     PositionError,
     async_log_exceptions,
+    clip,
     die_unless,
     log,
     pairwise,
     retry_on,
     takeuntil_inclusive,
+    until_error,
 )
 from sqlalchemy import (
     Boolean,
@@ -118,20 +121,30 @@ class ActivityEdge(Base):
 
     @staticmethod
     def activity_totals(session, start, step, limit=1):
+        end = start + step * limit
+        log.info(f"{start} {step} {limit}")
+        edges = get_edges_including_bounds(session, start, end)
+        activities = get_overlapping_intervals(edges, start, end)
+        front = deque()
         for i in range(limit):
             end = start + step
             total = 0
+            for activity in chain(until_error(front.popleft, IndexError), activities):
+                total += clip(
+                    clip(activity.end.time, high=end)
+                    - clip(activity.start.time, low=start),
+                    low=0,
+                )
+                if activity.end.time > end:
+                    front.appendleft(activity)
+                    break
             yield start, total
             start = end
 
     @staticmethod
-    def activity_total(session, start, end):
-        edges = get_edges_including_bounds(session, start, end)
-        activities = get_overlapping_intervals(edges, start, end)
-        return sum(
-            min(activity.end.time, end) - max(activity.start.time, start)
-            for activity in activities
-        )
+    def activity_total(session, start, step):
+        for time, total in ActivityEdge.activity_totals(session, start, step):
+            return total
 
     @staticmethod
     def session_start(session):

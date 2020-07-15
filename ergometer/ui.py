@@ -1,6 +1,7 @@
 import os
 import struct
 from datetime import datetime
+from itertools import zip_longest
 from math import ceil, isfinite
 
 import wx
@@ -81,7 +82,7 @@ class Tray(wx.adv.TaskBarIcon):
             day_end = day_start_of(now_dt) + in_seconds(days=1)
             end = ceil((now_dt.timestamp() - day_end) / step) * step + day_end
             start = end - step * limit
-            for labels, time_total in zip(
+            for labels, time_total in zip_longest(
                 label_rows, self.model.activity_totals(start, step, limit)
             ):
                 time_label, total_label = labels
@@ -128,12 +129,12 @@ class Tray(wx.adv.TaskBarIcon):
 
         def get_typed_values():
             has_errors = False
-            typed_values = []
+            typed_values = {}
             for type, field in typed_fields:
                 try:
                     value = parse(field, is_duration(type))
                     if value:
-                        typed_values.append((type, value))
+                        typed_values[type] = value
                 except ValueError:
                     # mark all errors before returning
                     has_errors = True
@@ -144,13 +145,17 @@ class Tray(wx.adv.TaskBarIcon):
             if save.waiting:
                 if not typed_values:
                     return
+                for type in typed_values:
+                    if type.name.endswith("_target"):
+                        save.waiting = 15
+                        break
                 wait()
                 timer.Start(1000)
                 for ctrl in controls:
                     ctrl.Disable()
             else:
                 time = int(imprecise_clock().timestamp())
-                for type, value in typed_values:
+                for type, value in typed_values.items():
                     self.model.push_local_event(
                         struct.pack(data_format, type.value, value, time)
                     )
@@ -166,7 +171,7 @@ class Tray(wx.adv.TaskBarIcon):
                 save_button.SetLabel("Save")
 
         def revise(*unused):
-            save.waiting = 5
+            save.waiting = 1
             timer.Stop()
             save_button.SetLabel("Preview")
             for ctrl in controls:
@@ -176,7 +181,7 @@ class Tray(wx.adv.TaskBarIcon):
         frame.Bind(wx.EVT_TIMER, wait, timer)
 
         button_row = wx.BoxSizer()
-        save.waiting = 15
+        save.waiting = 1
         save_button = wx.Button(frame, label="Preview")
         save_button.Bind(wx.EVT_BUTTON, save)
         button_row.Add(save_button)

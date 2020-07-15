@@ -173,3 +173,11 @@ def takeuntil_inclusive(predicate, iterable):
         yield x
         if predicate(x):
             return
+
+
+def until_error(f, E):
+    try:
+        while True:
+            yield f()
+    except E:
+        ...

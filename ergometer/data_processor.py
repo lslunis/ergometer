@@ -19,6 +19,7 @@ from ergometer.util import (
     log,
     retry_on,
     retry_on_iter,
+    until_error,
 )
 
 min_sleep = 0.016  # on Windows, sleep below this value returns immediately
@@ -46,12 +47,7 @@ async def local_event_publisher(host, broker, file_manager):
 async def local_event_writer(host, pop_local_event, file_manager):
     log.debug("Starting local_event_writer")
     while True:
-        events = []
-        try:
-            while True:
-                events.append(pop_local_event())
-        except IndexError:
-            ...
+        events = [*until_error(pop_local_event, IndexError)]
         if events:
             file_manager.write(host, events)
         await asyncio.sleep(min_sleep)
