@@ -55,18 +55,18 @@ class Controller:
         if self.top.HasCapture():
             self.top.ReleaseMouse()
 
-
     def maybe_draw_bars(self, metrics):
         bars = make_bars(metrics, self.top.GetClientSize().Width)
         if bars != self.bars:
             self.bars = bars
             self.top.Refresh()
 
-
     def paint(self, *unused):
         if self.bars:
-            draw_rectangles(wx.PaintDC(self.top), make_rectangles(self.bars, *self.top.GetClientSize().Get()))
-
+            draw_rectangles(
+                wx.PaintDC(self.top),
+                make_rectangles(self.bars, *self.top.GetClientSize().Get()),
+            )
 
     def maybe_set_tooltip(self, metrics):
         tooltip = make_tooltip(metrics)
@@ -340,54 +340,21 @@ def compute_fade(m):
             low=fade_min,
             high=fade_max,
         )
-    return ceil(255 * fade)
+    return round(255 * fade)
 
 
-def compute_rectangles(m, n):
+def make_rectangles(bars, frame_w, frame_h):
     # http://pteromys.melonisland.net/munsell/
     # set value to 8, render interpolated, take screenshot of chroma/hue grid
     # use MS Paint eyedropper tool to choose max chroma for several hues
     black = (28, 28, 28)
-    white = (255, 255, 255)
-    lime = (15, 231, 20)
-    blue = (35, 216, 253)
-    yellow = (239, 196, 15)
-    background = (0, 0, n, n, *white)
-    if not m:
-        return [background]
-    dv = m["daily_value"]
-    dt = m["daily_target"]
-    sv = m["session_value"]
-    st = m["session_target"]
-    rv = m["rest_value"]
-    rt = m["rest_target"]
-    srt = st + rt
-    rectangles = [
-        background,
-        (0, sv / srt * n, n, (st - sv) / srt * n, *lime),
-        (0, st / srt * n, n, (rt - rv) / srt * n, *yellow),
-    ]
-    k = 1
-    w = n / 2
-    g = n / 4
-    b = (n - k * w - (k - 1) * g) / 2
-    v = dv / dt * k
-    for i in range(int(v), k - int(v)):
-        x = b + (w + g) * i
-        y = clip(v - i, low=0) * n
-        rectangles.append((x, y, w, n - y, *blue))
-    return rectangles
-
-def make_rectangles(bars, frame_w, frame_h):
-    black = (28, 28, 28)
+    grey = (128, 128, 128)
     white = (255, 255, 255)
     blue = (35, 216, 253)
     lime = (15, 231, 20)
     yellow = (239, 196, 15)
     background = (0, 0, frame_w, frame_h, *black)
-    rectangles = [
-        background
-    ]
+    rectangles = [background]
     gap = 4
     height = (frame_h - 2 * gap) // 3
     alpha = 0.2
@@ -399,6 +366,13 @@ def make_rectangles(bars, frame_w, frame_h):
         unused = (bar, y, frame_w - bar, height, *color)
         rectangles += [used, unused]
 
+    for i in range(1, 12):
+        w = 2
+        color = grey if i % 3 else white
+        x = round(frame_w * i / 12 - w / 2)
+        tick = (x, 0, w, frame_h, *color)
+        rectangles.append(tick)
+
     return rectangles
 
 
@@ -407,8 +381,11 @@ def make_bars(m, width):
         return
     bars = []
     for x in ["daily", "session", "rest"]:
-        bars.append(clip(width * m[f"{x}_value"] // m[f"{x}_target"], low=0, high=width))
+        bars.append(
+            clip(width * m[f"{x}_value"] // m[f"{x}_target"], low=0, high=width)
+        )
     return bars
+
 
 def make_tooltip(metrics):
     return " - ".join(
@@ -422,7 +399,6 @@ def draw_rectangles(dc, rectangles):
     for x, y, w, h, r, g, b in rectangles:
         dc.SetBrush(wx.Brush(wx.Colour(r, g, b)))
         dc.DrawRectangle(x, y, w, h)
-
 
 
 class Fader:
@@ -456,7 +432,6 @@ def main():
         maybe_fade(compute_fade(metrics))
         controller.maybe_draw_bars(metrics)
         controller.maybe_set_tooltip(metrics)
-
 
     @log_exceptions
     def exit(*unused):
