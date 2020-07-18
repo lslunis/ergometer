@@ -28,11 +28,13 @@ class Controller:
         top.Bind(wx.EVT_LEFT_DOWN, self.mouse_down)
         top.Bind(wx.EVT_MOTION, self.move)
         top.Bind(wx.EVT_LEFT_UP, self.mouse_up)
+        top.Bind(wx.EVT_PAINT, self.paint)
         self.top = top
         self.model = model
         self.history_step = "1d"
         self.mouse_position = None
         self.tooltip = None
+        self.bars = None
 
     def get_mouse_position(self, event):
         return self.top.ClientToScreen(event.GetPosition())
@@ -52,6 +54,19 @@ class Controller:
     def mouse_up(self, *unused):
         if self.top.HasCapture():
             self.top.ReleaseMouse()
+
+
+    def maybe_draw_bars(self, metrics):
+        bars = make_bars(metrics, self.top.GetClientSize().Width)
+        if bars != self.bars:
+            self.bars = bars
+            self.top.Refresh()
+
+
+    def paint(self, *unused):
+        if self.bars:
+            draw_rectangles(wx.PaintDC(self.top), make_rectangles(self.bars, *self.top.GetClientSize().Get()))
+
 
     def maybe_set_tooltip(self, metrics):
         tooltip = make_tooltip(metrics)
@@ -363,6 +378,37 @@ def compute_rectangles(m, n):
         rectangles.append((x, y, w, n - y, *blue))
     return rectangles
 
+def make_rectangles(bars, frame_w, frame_h):
+    black = (28, 28, 28)
+    white = (255, 255, 255)
+    blue = (35, 216, 253)
+    lime = (15, 231, 20)
+    yellow = (239, 196, 15)
+    background = (0, 0, frame_w, frame_h, *black)
+    rectangles = [
+        background
+    ]
+    gap = 4
+    height = (frame_h - 2 * gap) // 3
+    alpha = 0.2
+    for i, bar_color in enumerate(zip(bars, [blue, lime, yellow])):
+        bar, color = bar_color
+        y = (height + gap) * i
+        dark_color = [round(alpha * c + (1 - alpha) * b) for b, c in zip(black, color)]
+        used = (0, y, bar, height, *dark_color)
+        unused = (bar, y, frame_w - bar, height, *color)
+        rectangles += [used, unused]
+
+    return rectangles
+
+
+def make_bars(m, width):
+    if not width:
+        return
+    bars = []
+    for x in ["daily", "session", "rest"]:
+        bars.append(clip(width * m[f"{x}_value"] // m[f"{x}_target"], low=0, high=width))
+    return bars
 
 def make_tooltip(metrics):
     return " - ".join(
@@ -371,17 +417,12 @@ def make_tooltip(metrics):
     )
 
 
-def create_icon_with_tooltip(metrics=None):
-    size = 32
-    bmp = wx.Bitmap(size, size)
-    dc = wx.MemoryDC(bmp)
+def draw_rectangles(dc, rectangles):
     dc.SetPen(wx.Pen(wx.Colour(), style=wx.PENSTYLE_TRANSPARENT))
-    for x, y, w, h, r, g, b in compute_rectangles(metrics, size):
+    for x, y, w, h, r, g, b in rectangles:
         dc.SetBrush(wx.Brush(wx.Colour(r, g, b)))
         dc.DrawRectangle(x, y, w, h)
-    dc.SelectObject(wx.NullBitmap)
 
-    return wx.Icon(bmp), make_tooltip(metrics)
 
 
 class Fader:
@@ -413,7 +454,9 @@ def main():
         if metrics is None:
             return
         maybe_fade(compute_fade(metrics))
+        controller.maybe_draw_bars(metrics)
         controller.maybe_set_tooltip(metrics)
+
 
     @log_exceptions
     def exit(*unused):
