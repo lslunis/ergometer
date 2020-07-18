@@ -120,7 +120,7 @@ class ActivityEdge(Base):
         return f"<ActivityEdge {self.time} {arrow}>"
 
     @staticmethod
-    def activity_totals(session, start, step, limit=1):
+    def activity_totals(session, start, step, limit):
         end = start + step * limit
         log.info(f"{start} {step} {limit}")
         edges = get_edges_including_bounds(session, start, end)
@@ -142,8 +142,8 @@ class ActivityEdge(Base):
             start = end
 
     @staticmethod
-    def activity_total(session, start, step):
-        for time, total in ActivityEdge.activity_totals(session, start, step):
+    def activity_total(session, start, end):
+        for time, total in ActivityEdge.activity_totals(session, start, end - start, 1):
             return total
 
     @staticmethod
@@ -287,9 +287,9 @@ class EventType(Enum):
     daily_target = (1, in_seconds(hours=8))
     session_target = (2, in_seconds(hours=1))
     rest_target = (3, in_seconds(minutes=5))
-    daily_notice = (4, in_seconds(minutes=2))
-    session_notice = (5, in_seconds(minutes=2))
-    rest_notice = (6, in_seconds(minutes=2))
+    daily_notice = (4, 14 / 15)
+    session_notice = (5, 14 / 15)
+    rest_notice = (6, 0.5)
     fade_min = (7, 0.1)
     fade_max = (8, 0.9)
     unfade_multiplier = (9, 1)

@@ -2,7 +2,7 @@ import os
 import struct
 from datetime import datetime
 from itertools import zip_longest
-from math import ceil, isfinite
+from math import ceil, isfinite, exp
 
 import wx
 import wx.adv
@@ -15,7 +15,7 @@ from ergometer.time import (
     min_time,
     precise_clock,
 )
-from ergometer.util import clip, init, log, log_exceptions
+from ergometer.util import clip, init, lerp, log, log_exceptions
 
 
 class Tray(wx.adv.TaskBarIcon):
@@ -147,7 +147,7 @@ class Tray(wx.adv.TaskBarIcon):
                     return
                 for type in typed_values:
                     if type.name.endswith("_target"):
-                        save.waiting = 15
+                        save.waiting = 2
                         break
                 wait()
                 timer.Start(1000)
@@ -248,7 +248,7 @@ def parse(field, as_duration):
 
 
 def is_duration(type):
-    return type.name.rpartition("_")[-1] in ["notice", "target"]
+    return type.name.rpartition("_")[-1] in ["target"]
 
 
 suffix_to_unit = dict(w="weeks", d="days", h="hours", m="minutes", s="seconds")
@@ -276,51 +276,104 @@ def from_seconds_using_suffix(value, suffix):
     return value / in_seconds_using_suffix(1, suffix)
 
 
-def compute_opacity(metrics):
-    opacity = 0
-    return int(255 * opacity)
+def compute_fade(m):
+    m = {"session_value": m["session_value"] - m["rest_value"], **m}
+    fade = 0
+    fade_min = m["fade_min"]
+    fade_max = m["fade_max"]
+    for kind in ["daily", "session", "rest"]:
+        is_rest = kind == "rest"
+        value = m[f"{kind}_value"]
+        target = m[f"{kind}_target"]
+        notice = target * m[f"{kind}_notice"]
+        if value < notice:
+            f = 0
+        elif value < target:
+            f = fade_min if is_rest else lerp(value, notice, target, 0, fade_max)
+        else:
+            f = 0 if is_rest else fade_max
+        fade = max(fade, f)
+        print(f)
+    if fade > fade_min:
+        k = m["unfade_multiplier"]
+        fade = clip(
+            fade + k - k * exp(m["unfade_rate"] * m["rest_value"]),
+            low=fade_min,
+            high=fade_max,
+        )
+    return ceil(255 * fade)
 
 
-def compute_rectangles(metrics, size):
-    return []
+def compute_rectangles(m, n):
+    # http://pteromys.melonisland.net/munsell/
+    # set value to 8, render interpolated, take screenshot of chroma/hue grid
+    # use MS Paint eyedropper tool to choose max chroma for several hues
+    black = (28, 28, 28)
+    white = (255, 255, 255)
+    lime = (15, 231, 20)
+    blue = (35, 216, 253)
+    yellow = (239, 196, 15)
+    background = (0, 0, n, n, *white)
+    if not m:
+        return [background]
+    dv = m["daily_value"]
+    dt = m["daily_target"]
+    sv = m["session_value"]
+    st = m["session_target"]
+    rv = m["rest_value"]
+    rt = m["rest_target"]
+    srt = st + rt
+    rectangles = [
+        background,
+        (0, sv / srt * n, n, (st - sv) / srt * n, *lime),
+        (0, st / srt * n, n, (rt - rv) / srt * n, *yellow),
+    ]
+    k = 1
+    w = n / 2
+    g = n / 4
+    b = (n - k * w - (k - 1) * g) / 2
+    v = dv / dt * k
+    for i in range(int(v), k - int(v)):
+        x = b + (w + g) * i
+        y = clip(v - i, low=0) * n
+        rectangles.append((x, y, w, n - y, *blue))
+    return rectangles
 
 
-"""
-error:red, rest:orange, session:indigo, daily:teal
+def compute_tooltip(metrics):
+    return (
+        " - ".join(
+            format_in_minutes(metrics[f"{x}_target"] - metrics[f"{x}_value"])
+            for x in ["daily", "session", "rest"]
+        )
+        if metrics
+        else "Ergometer"
+    )
 
-const red = '#fc003c' // 5.0R-5-20
-const orange = '#e53800' // 10.0R-5-18
-const teal = '#009d89' // 2.5BG-5-24
-const indigo = '#486aff' // 7.5PB-5-20
-"""
 
-
-def create_icon_with_tooltip(metrics):
+def create_icon_with_tooltip(metrics=None):
     size = 32
     bmp = wx.Bitmap(size, size)
     dc = wx.MemoryDC(bmp)
     dc.SetPen(wx.Pen(wx.Colour(), style=wx.PENSTYLE_TRANSPARENT))
-    for r, g, b, x, y, w, h in compute_rectangles(metrics, size):
+    for x, y, w, h, r, g, b in compute_rectangles(metrics, size):
         dc.SetBrush(wx.Brush(wx.Colour(r, g, b)))
         dc.DrawRectangle(x, y, w, h)
     dc.SelectObject(wx.NullBitmap)
 
-    tooltip = " - ".join(
-        format_in_minutes(metrics[f"{x}_target"] - metrics[f"{x}_value"])
-        for x in ["daily", "session", "rest"]
-    )
-    return wx.Icon(bmp), tooltip
+    return wx.Icon(bmp), compute_tooltip(metrics)
 
 
-class OpacitySetter:
+class Fader:
     def __init__(self, top):
         self.top = top
-        self.opacity = None
+        self.fade = None
 
-    def __call__(self, opacity):
-        if opacity != self.opacity:
-            self.top.SetTransparent(clip(opacity, low=0, high=254))
-            self.opacity = opacity
+    def __call__(self, fade):
+        if fade != self.fade:
+            log.info(f"fade {fade}")
+            self.top.SetTransparent(clip(fade, low=0, high=254))
+            self.fade = fade
 
 
 @log_exceptions
@@ -330,7 +383,7 @@ def main():
         metrics = model.metrics_at(precise_clock().timestamp())
         if metrics is None:
             return
-        maybe_set_opacity(compute_opacity(metrics))
+        maybe_fade(compute_fade(metrics))
         tray.maybe_set_icon(lambda: create_icon_with_tooltip(metrics))
 
     @log_exceptions
@@ -347,11 +400,13 @@ def main():
     app = wx.App()
     style = wx.TRANSPARENT_WINDOW | wx.STAY_ON_TOP | wx.FRAME_TOOL_WINDOW | wx.MAXIMIZE
     top = wx.Frame(None, style=style) if os.name == "nt" else wx.Frame(None)
-    maybe_set_opacity = OpacitySetter(top)
-    maybe_set_opacity(0)
+    maybe_fade = Fader(top)
+    maybe_fade(0)
     top.Show()
     model = Model(config, threaded=True)
     tray = Tray(top, model)
+    tray.maybe_set_icon(lambda: create_icon_with_tooltip())
+
     timer = wx.Timer(top)
     top.Bind(wx.EVT_TIMER, draw, timer)
     top.Bind(wx.EVT_CLOSE, exit)

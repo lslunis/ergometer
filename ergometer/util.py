@@ -96,6 +96,10 @@ def init():
     return config
 
 
+def lerp(x, x0, x1, y0, y1):
+    return (x - x0) * (y1 - y0) / (x1 - x0)
+
+
 def log_exceptions(fn):
     @wraps(fn)
     def logged(*args, **kw):
