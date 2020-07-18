@@ -10,6 +10,7 @@ from os import path as path
 from time import time_ns
 
 import websockets
+
 from ergometer import messages as m
 from ergometer.database import EventType, data_format, database_updater
 from ergometer.time import imprecise_clock

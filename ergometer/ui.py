@@ -2,10 +2,11 @@ import os
 import struct
 from datetime import datetime
 from itertools import zip_longest
-from math import ceil, isfinite, exp
+from math import ceil, exp, isfinite
 
 import wx
 import wx.adv
+
 from ergometer.database import data_format, setting_types
 from ergometer.model import Model
 from ergometer.time import (
@@ -17,17 +18,19 @@ from ergometer.time import (
 )
 from ergometer.util import clip, init, lerp, log, log_exceptions
 
+is_windows = os.name == "nt"
 
-class Tray(wx.adv.TaskBarIcon):
+
+class Controller:
     def __init__(self, top, model):
-        wx.adv.TaskBarIcon.__init__(self)
-        self.Bind(wx.adv.EVT_TASKBAR_LEFT_DOWN, self.show_history)
+        top.Bind(wx.EVT_LEFT_DCLICK, self.show_history)
+        top.Bind(wx.EVT_CONTEXT_MENU, self.show_menu)
         self.top = top
         self.model = model
         self.history_step = "1d"
-        self.last_set_icon = min_time
+        self.last_animated = min_time
 
-    def CreatePopupMenu(self):
+    def show_menu(self, *unused):
         menu = wx.Menu()
         items = {}
         if self.model.ready:
@@ -37,13 +40,13 @@ class Tray(wx.adv.TaskBarIcon):
             item = wx.MenuItem(menu, wx.ID_ANY, label)
             menu.Bind(wx.EVT_MENU, fn, id=item.GetId())
             menu.Append(item)
-        return menu
+        self.top.PopupMenu(menu)
 
-    def maybe_set_icon(self, get_icon_with_tooltip):
+    def maybe_animate(self, get_icon_with_tooltip):
         now = precise_clock().timestamp()
-        if now - self.last_set_icon < 6:
+        if now - self.last_animated < 6:
             return
-        self.last_set_icon = now
+        self.last_animated = now
         self.SetIcon(*get_icon_with_tooltip())
 
     def show_history(self, *unused):
@@ -293,7 +296,6 @@ def compute_fade(m):
         else:
             f = 0 if is_rest else fade_max
         fade = max(fade, f)
-        print(f)
     if fade > fade_min:
         k = m["unfade_multiplier"]
         fade = clip(
@@ -371,9 +373,18 @@ class Fader:
 
     def __call__(self, fade):
         if fade != self.fade:
+            fade = clip(fade, low=0, high=254)
             log.info(f"fade {fade}")
-            self.top.SetTransparent(clip(fade, low=0, high=254))
+            self.top.SetTransparent(
+                fade
+            ) if is_windows else self.top.SetBackgroundColour(
+                wx.Colour(fade, fade, fade)
+            )
             self.fade = fade
+
+
+def make_frame(parent, style):
+    return wx.Frame(parent, style=style) if is_windows else wx.Frame(parent)
 
 
 @log_exceptions
@@ -384,28 +395,27 @@ def main():
         if metrics is None:
             return
         maybe_fade(compute_fade(metrics))
-        tray.maybe_set_icon(lambda: create_icon_with_tooltip(metrics))
 
     @log_exceptions
     def exit(*unused):
         log.info("Ergometer exiting")
         model.exit()
-        tray.RemoveIcon()
-        tray.Destroy()
         top.Destroy()
         log.info("Ergometer exited")
 
     config = init()
 
     app = wx.App()
-    style = wx.TRANSPARENT_WINDOW | wx.STAY_ON_TOP | wx.FRAME_TOOL_WINDOW | wx.MAXIMIZE
-    top = wx.Frame(None, style=style) if os.name == "nt" else wx.Frame(None)
-    maybe_fade = Fader(top)
-    maybe_fade(0)
-    top.Show()
+    top = make_frame(None, wx.RESIZE_BORDER | wx.STAY_ON_TOP | wx.FRAME_TOOL_WINDOW)
     model = Model(config, threaded=True)
-    tray = Tray(top, model)
-    tray.maybe_set_icon(lambda: create_icon_with_tooltip())
+    controller = Controller(top, model)
+    top.Show()
+    overlay = make_frame(
+        top, wx.TRANSPARENT_WINDOW | wx.STAY_ON_TOP | wx.FRAME_TOOL_WINDOW | wx.MAXIMIZE
+    )
+    maybe_fade = Fader(overlay)
+    maybe_fade(0)
+    overlay.Show()
 
     timer = wx.Timer(top)
     top.Bind(wx.EVT_TIMER, draw, timer)
