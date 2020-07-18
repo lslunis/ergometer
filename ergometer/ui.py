@@ -31,18 +31,15 @@ class Controller:
         self.top = top
         self.model = model
         self.history_step = "1d"
-        self.last_animated = min_time
         self.mouse_position = None
-
+        self.tooltip = None
 
     def get_mouse_position(self, event):
         return self.top.ClientToScreen(event.GetPosition())
 
-
     def mouse_down(self, event):
         self.top.CaptureMouse()
         self.mouse_position = self.get_mouse_position(event)
-
 
     def move(self, event):
         if self.mouse_position and event.Dragging() and event.LeftIsDown():
@@ -52,11 +49,15 @@ class Controller:
             fx, fy = self.top.GetScreenPosition().Get()
             self.top.Move(fx + x - old_x, fy + y - old_y)
 
-
     def mouse_up(self, *unused):
         if self.top.HasCapture():
             self.top.ReleaseMouse()
 
+    def maybe_set_tooltip(self, metrics):
+        tooltip = make_tooltip(metrics)
+        if tooltip != self.tooltip:
+            self.top.SetToolTip(tooltip)
+            self.tooltip = tooltip
 
     def show_menu(self, *unused):
         menu = wx.Menu()
@@ -69,13 +70,6 @@ class Controller:
             menu.Bind(wx.EVT_MENU, fn, id=item.GetId())
             menu.Append(item)
         self.top.PopupMenu(menu)
-
-    def maybe_animate(self, get_icon_with_tooltip):
-        now = precise_clock().timestamp()
-        if now - self.last_animated < 6:
-            return
-        self.last_animated = now
-        self.SetIcon(*get_icon_with_tooltip())
 
     def show_history(self, *unused):
         if not self.model.ready:
@@ -370,14 +364,10 @@ def compute_rectangles(m, n):
     return rectangles
 
 
-def compute_tooltip(metrics):
-    return (
-        " - ".join(
-            format_in_minutes(metrics[f"{x}_target"] - metrics[f"{x}_value"])
-            for x in ["daily", "session", "rest"]
-        )
-        if metrics
-        else "Ergometer"
+def make_tooltip(metrics):
+    return " - ".join(
+        format_in_minutes(metrics[f"{x}_target"] - metrics[f"{x}_value"])
+        for x in ["daily", "session", "rest"]
     )
 
 
@@ -391,7 +381,7 @@ def create_icon_with_tooltip(metrics=None):
         dc.DrawRectangle(x, y, w, h)
     dc.SelectObject(wx.NullBitmap)
 
-    return wx.Icon(bmp), compute_tooltip(metrics)
+    return wx.Icon(bmp), make_tooltip(metrics)
 
 
 class Fader:
@@ -423,6 +413,7 @@ def main():
         if metrics is None:
             return
         maybe_fade(compute_fade(metrics))
+        controller.maybe_set_tooltip(metrics)
 
     @log_exceptions
     def exit(*unused):
