@@ -25,10 +25,38 @@ class Controller:
     def __init__(self, top, model):
         top.Bind(wx.EVT_LEFT_DCLICK, self.show_history)
         top.Bind(wx.EVT_CONTEXT_MENU, self.show_menu)
+        top.Bind(wx.EVT_LEFT_DOWN, self.mouse_down)
+        top.Bind(wx.EVT_MOTION, self.move)
+        top.Bind(wx.EVT_LEFT_UP, self.mouse_up)
         self.top = top
         self.model = model
         self.history_step = "1d"
         self.last_animated = min_time
+        self.mouse_position = None
+
+
+    def get_mouse_position(self, event):
+        return self.top.ClientToScreen(event.GetPosition())
+
+
+    def mouse_down(self, event):
+        self.top.CaptureMouse()
+        self.mouse_position = self.get_mouse_position(event)
+
+
+    def move(self, event):
+        if self.mouse_position and event.Dragging() and event.LeftIsDown():
+            old_x, old_y = self.mouse_position.Get()
+            self.mouse_position = self.get_mouse_position(event)
+            x, y = self.mouse_position.Get()
+            fx, fy = self.top.GetScreenPosition().Get()
+            self.top.Move(fx + x - old_x, fy + y - old_y)
+
+
+    def mouse_up(self, *unused):
+        if self.top.HasCapture():
+            self.top.ReleaseMouse()
+
 
     def show_menu(self, *unused):
         menu = wx.Menu()
