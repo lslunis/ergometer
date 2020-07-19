@@ -1,7 +1,7 @@
 import os
 import struct
 from datetime import datetime
-from itertools import zip_longest
+from itertools import chain, zip_longest
 from math import ceil, exp, isfinite
 from math import log as ln
 
@@ -20,6 +20,15 @@ from ergometer.util import clip, init, lerp, log, log_exceptions
 
 is_windows = os.name == "nt"
 
+# http://pteromys.melonisland.net/munsell/
+# set value to 8, render interpolated, take screenshot of chroma/hue grid
+# use MS Paint eyedropper tool to choose max chroma for several hues
+black = (28, 28, 28)
+gray = (128, 128, 128)
+white = (255, 255, 255)
+blue = (35, 216, 253)
+lime = (15, 231, 20)
+yellow = (239, 196, 15)
 
 class Controller:
     def __init__(self, top, model):
@@ -340,15 +349,6 @@ def compute_fade(m):
 
 
 def make_rectangles(bars, frame_w, frame_h):
-    # http://pteromys.melonisland.net/munsell/
-    # set value to 8, render interpolated, take screenshot of chroma/hue grid
-    # use MS Paint eyedropper tool to choose max chroma for several hues
-    black = (28, 28, 28)
-    grey = (128, 128, 128)
-    white = (255, 255, 255)
-    blue = (35, 216, 253)
-    lime = (15, 231, 20)
-    yellow = (239, 196, 15)
     background = (0, 0, frame_w, frame_h, *black)
     rectangles = [background]
     gap = 1
@@ -364,7 +364,7 @@ def make_rectangles(bars, frame_w, frame_h):
 
     for i in range(1, 12):
         w = 2
-        color = grey if i % 3 else white
+        color = white if i % 3 == 0 else gray
         x = round(frame_w * i / 12 - w / 2)
         tick = (x, 0, w, frame_h, *color)
         rectangles.append(tick)
@@ -419,6 +419,16 @@ def make_frame(parent, style):
     return wx.Frame(parent, style=style) if is_windows else wx.Frame(parent)
 
 
+def paint_overlay(overlay):
+    width, height = wx.DisplaySize()
+    spacing = width // 32
+    stroke = 2
+    color = lambda xy, phase = 0: white if (xy / spacing) % 3 == phase else gray
+    horizontals = ((0, round(y - stroke / 2), width, stroke, *color(y)) for y in range(spacing, height, spacing))
+    verticals = ((round(x - stroke / 2), 0, stroke, height, *color(x, 1)) for x in range(spacing, width, spacing))
+    draw_rectangles(wx.PaintDC(overlay), chain(horizontals, verticals))
+
+
 @log_exceptions
 def main():
     @log_exceptions
@@ -452,6 +462,7 @@ def main():
     overlay = make_frame(
         top, wx.TRANSPARENT_WINDOW | wx.STAY_ON_TOP | wx.FRAME_TOOL_WINDOW | wx.MAXIMIZE
     )
+    overlay.Bind(wx.EVT_PAINT, lambda *unused: paint_overlay(overlay))
     maybe_fade = Fader(overlay)
     maybe_fade(0)
     overlay.Show()
