@@ -6,19 +6,6 @@ from functools import total_ordering
 from itertools import chain, dropwhile, islice, repeat
 from time import time_ns
 
-from sqlalchemy import (
-    Boolean,
-    Column,
-    Float,
-    Integer,
-    String,
-    create_engine,
-    event,
-    func,
-)
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-
 from ergometer.time import (
     day_start_of,
     imprecise_clock,
@@ -39,6 +26,18 @@ from ergometer.util import (
     takeuntil_inclusive,
     until_error,
 )
+from sqlalchemy import (
+    Boolean,
+    Column,
+    Float,
+    Integer,
+    String,
+    create_engine,
+    event,
+    func,
+)
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
 
 
 class connect(sessionmaker):
@@ -102,6 +101,7 @@ class Setting(Base):
     def update_if_newer(self, value, time):
         if self.time < time:
             self.value = value
+            return True
 
 
 class ActivityEdge(Base):
@@ -291,10 +291,10 @@ class EventType(Enum):
     daily_notice = (4, 14 / 15)
     session_notice = (5, 14 / 15)
     rest_notice = (6, 0.5)
-    fade_min = (7, 0.1)
-    fade_max = (8, 0.9)
-    unfade_multiplier = (9, 1)
-    unfade_rate = (10, 1)
+    fade_min = (7, 0.12)
+    fade_mid = (8, 0.72)
+    fade_max = (9, 0.96)
+    fade_max_decay = (10, in_seconds(minutes=1))
 
     def __new__(cls, value, default=None):
         self = object.__new__(cls)
@@ -363,6 +363,7 @@ def update_database(cache, update_cache, now, session, host, position, data):
     activity_updater = ActivityUpdater(session)
     min_activity_start = max_time
     max_activity_end = min_time
+    updated_settings = set()
 
     for event_type_id, value, time in struct.iter_unpack(data_format, data):
         event_type = EventType(event_type_id)
@@ -378,13 +379,16 @@ def update_database(cache, update_cache, now, session, host, position, data):
                 # by less than min_idle seconds
                 daily_total += activity_increase
         elif event_type.is_setting:
-            event_type.get(session).update_if_newer(value, time)
+            setting = event_type.get(session)
+            updated = setting.update_if_newer(value, time)
+            if updated:
+                updated_settings.add(setting)
         else:
             log.error(f"Unhandled: {event_type}")
 
     delta = {}
     rest_target_changed = False
-    for setting in session.dirty:
+    for setting in updated_settings:
         if isinstance(setting, Setting):
             delta[setting.name] = setting.value
             if setting.name == "rest_target":

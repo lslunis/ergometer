@@ -3,11 +3,11 @@ import struct
 from datetime import datetime
 from itertools import zip_longest
 from math import ceil, exp, isfinite
+from math import log as ln
 
 import wx
 import wx.adv
-
-from ergometer.database import data_format, setting_types
+from ergometer.database import data_format, min_pause, setting_types
 from ergometer.model import Model
 from ergometer.time import (
     day_start_of,
@@ -98,15 +98,7 @@ class Controller:
             label_rows.append(labels)
             for j in range(2):
                 label = wx.StaticText(frame)
-                label.SetFont(
-                    wx.Font(
-                        10,
-                        wx.FONTFAMILY_TELETYPE,
-                        wx.NORMAL,
-                        wx.NORMAL,
-                        faceName="Consolas",
-                    )
-                )
+                label.SetFont(wx.Font(wx.FontInfo(10).FaceName("Consolas")))
                 grid.Add(label, wx.ALIGN_RIGHT if j == 1 else 0)
                 labels.append(label)
 
@@ -160,7 +152,7 @@ class Controller:
         settings = [(type, metrics[type.name]) for type in setting_types]
         for type, value in settings:
             add_label(type.name.capitalize().replace("_", " "))
-            add_label(format_duration(value) if is_duration(type) else str(value))
+            add_label(format_duration(value) if is_duration(type) else f"{value:.4g}")
 
             field = wx.TextCtrl(frame)
             grid.Add(field)
@@ -187,7 +179,7 @@ class Controller:
                     return
                 for type in typed_values:
                     if type.name.endswith("_target"):
-                        save.waiting = 2
+                        save.waiting = 15
                         break
                 wait()
                 timer.Start(1000)
@@ -232,14 +224,13 @@ class Controller:
         button_row.Add(revise_button)
 
         column = wx.BoxSizer(wx.VERTICAL)
+        warning = wx.StaticText(
+            frame, label="You have a flare-up next week. Are you surprised?"
+        )
+        warning.SetFont(wx.Font(wx.FontInfo(16)))
+
         column.AddMany(
-            [
-                grid,
-                wx.StaticText(
-                    frame, label="You have a flare-up next week. Are you surprised?"
-                ),
-                button_row,
-            ]
+            [grid, warning, button_row,]
         )
         frame.SetSizerAndFit(column)
         show_in_corner(frame)
@@ -250,7 +241,7 @@ def show_in_corner(frame):
     fw, fh = frame.GetSize()
     fx = dx + dw - fw
     fy = dy + dh - fh
-    frame.SetPosition((fx, fy))
+    frame.Move(fx, fy)
     frame.Raise()
     frame.Show()
 
@@ -288,7 +279,7 @@ def parse(field, as_duration):
 
 
 def is_duration(type):
-    return type.name.rpartition("_")[-1] in ["target"]
+    return type.name.rpartition("_")[-1] in ["target", "decay"]
 
 
 suffix_to_unit = dict(w="weeks", d="days", h="hours", m="minutes", s="seconds")
@@ -317,10 +308,12 @@ def from_seconds_using_suffix(value, suffix):
 
 
 def compute_fade(m):
-    m = {"session_value": m["session_value"] - m["rest_value"], **m}
+    m = {**m, "session_value": m["session_value"] - m["rest_value"]}
     fade = 0
     fade_min = m["fade_min"]
+    fade_mid = m["fade_mid"]
     fade_max = m["fade_max"]
+    fade_max_decay = m["fade_max_decay"]
     for kind in ["daily", "session", "rest"]:
         is_rest = kind == "rest"
         value = m[f"{kind}_value"]
@@ -334,9 +327,12 @@ def compute_fade(m):
             f = 0 if is_rest else fade_max
         fade = max(fade, f)
     if fade > fade_min:
-        k = m["unfade_multiplier"]
+        k = (fade_min * fade_max - fade_mid ** 2) / (fade_min + fade_max - 2 * fade_mid)
+        invert = lambda f, p: ln((k - f) / (k - fade_max)) / p
+        r = invert(fade_min, m["fade_max_decay"])
+        t0 = invert(fade, r)
         fade = clip(
-            fade + k - k * exp(m["unfade_rate"] * m["rest_value"]),
+            k - (k - fade_max) * exp(r * (t0 + m["rest_value"])),
             low=fade_min,
             high=fade_max,
         )
@@ -355,7 +351,7 @@ def make_rectangles(bars, frame_w, frame_h):
     yellow = (239, 196, 15)
     background = (0, 0, frame_w, frame_h, *black)
     rectangles = [background]
-    gap = 4
+    gap = 1
     height = (frame_h - 2 * gap) // 3
     alpha = 0.2
     for i, bar_color in enumerate(zip(bars, [blue, lime, yellow])):
@@ -379,6 +375,8 @@ def make_rectangles(bars, frame_w, frame_h):
 def make_bars(m, width):
     if not width:
         return
+    rv = m["rest_value"]
+    m = {**m, "rest_value": 0 if rv < min_pause else rv}
     bars = []
     for x in ["daily", "session", "rest"]:
         bars.append(
@@ -388,10 +386,12 @@ def make_bars(m, width):
 
 
 def make_tooltip(metrics):
-    return " - ".join(
-        format_in_minutes(metrics[f"{x}_target"] - metrics[f"{x}_value"])
-        for x in ["daily", "session", "rest"]
-    )
+    strings = []
+    for x in ["daily", "session", "rest"]:
+        value = format_in_minutes(metrics[f"{x}_value"])[:-1]
+        target = format_in_minutes(metrics[f"{x}_target"])
+        strings.append(f"{value}/{target}")
+    return " - ".join(strings)
 
 
 def draw_rectangles(dc, rectangles):
@@ -409,12 +409,9 @@ class Fader:
     def __call__(self, fade):
         if fade != self.fade:
             fade = clip(fade, low=0, high=254)
-            log.info(f"fade {fade}")
-            self.top.SetTransparent(
-                fade
-            ) if is_windows else self.top.SetBackgroundColour(
-                wx.Colour(fade, fade, fade)
-            )
+            c = 0 if is_windows else fade
+            self.top.SetBackgroundColour(wx.Colour(c))
+            self.top.SetTransparent(fade)
             self.fade = fade
 
 
@@ -443,9 +440,14 @@ def main():
     config = init()
 
     app = wx.App()
-    top = make_frame(None, wx.RESIZE_BORDER | wx.STAY_ON_TOP | wx.FRAME_TOOL_WINDOW)
+    top = make_frame(None, wx.STAY_ON_TOP | wx.FRAME_TOOL_WINDOW)
     model = Model(config, threaded=True)
     controller = Controller(top, model)
+    dw, dh = wx.DisplaySize()
+    tw = dw * 3 // 8
+    th = 40
+    top.SetSize(tw, th)
+    top.Move(dw / 2, dh - th)
     top.Show()
     overlay = make_frame(
         top, wx.TRANSPARENT_WINDOW | wx.STAY_ON_TOP | wx.FRAME_TOOL_WINDOW | wx.MAXIMIZE
