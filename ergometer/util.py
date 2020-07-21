@@ -42,9 +42,7 @@ def init():
         "button_count_ignore_list": [],
         "data": "",
         "generate_activity": False,
-        "insecure": False,
         "log": 10,
-        "port": 5187,
         "source_root": getattr(
             sys, "_MEIPASS", os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         ),
@@ -58,14 +56,10 @@ def init():
     p.add_argument("--button_count_ignore_list", nargs="+", type=int)
     p.add_argument("--data")
     p.add_argument("--generate_activity", action="store_true")
-    p.add_argument("--insecure", action="store_true")
     p.add_argument("--log", type=int)
-    p.add_argument("--port", type=int)
     p.add_argument("--server")
     p.add_argument("--verbose", action="store_true")
     config.update(vars(p.parse_args()))
-    config.setdefault("server", f"ws://localhost:{config['port']}")
-    die_unless(not re.match(r"ws:.*@", config["server"]) or config["insecure"])
 
     storage_root = os.path.join(config["source_root"], "data", config["data"])
     os.makedirs(storage_root, exist_ok=True)

@@ -1,4 +1,5 @@
 import asyncio
+import os
 import sys
 
 import websockets
@@ -47,10 +48,11 @@ def client_handler(file_manager):
 
 @async_log_exceptions
 async def serve():
-    port = init()["port"]
+    init()
     file_manager = FileManager("broker")
+    port = os.environ['VIRTUAL_PORT']
     log.debug(f"listening on port {port}")
-    server = await websockets.serve(client_handler(file_manager), port=port,)
+    server = await websockets.serve(client_handler(file_manager), port=port)
     await server.wait_closed()
     log.info("Ergometer exited")
 

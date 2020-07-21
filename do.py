@@ -60,7 +60,6 @@ def fix():
 
 
 def run(name, args):
-    # docker run -p 5187:5187 ergometer_server
     python = get_bin_path(get_venv_name(name), "python" if is_windows else "python3")
     execute([python, f"ergometer_{name}.py", *args])
 

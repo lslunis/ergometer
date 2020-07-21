@@ -2,5 +2,6 @@ __pycache__
 *.exe
 *.obj
 config.json
-data/
-venv/
+data
+htpasswd
+venv
