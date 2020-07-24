@@ -50,7 +50,7 @@ def client_handler(file_manager):
 async def serve():
     init()
     file_manager = FileManager("broker")
-    port = os.environ['VIRTUAL_PORT']
+    port = os.environ["VIRTUAL_PORT"]
     log.debug(f"listening on port {port}")
     server = await websockets.serve(client_handler(file_manager), port=port)
     await server.wait_closed()

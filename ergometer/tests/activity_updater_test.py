@@ -95,6 +95,16 @@ def test_time_falls_between_pauses():
         assert_activity(session, 25, 30, 59, 65)
 
 
+def test_bound_deleted_regression():
+    with connect("sqlite://") as Session:
+        session = Session()
+        activity_updater = ActivityUpdater(session)
+        assert activity_updater.update(0, 1) == 1
+        assert activity_updater.update(1, 1) == 1
+        assert activity_updater.update(1, 1) == 0
+        assert_activity(session, 0, 2)
+
+
 class QueryCounter:
     def __init__(self, session):
         self.session = session

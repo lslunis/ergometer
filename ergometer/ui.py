@@ -30,6 +30,7 @@ blue = (35, 216, 253)
 lime = (15, 231, 20)
 yellow = (239, 196, 15)
 
+
 class Controller:
     def __init__(self, top, model):
         top.Bind(wx.EVT_LEFT_DCLICK, self.show_history)
@@ -423,9 +424,15 @@ def paint_overlay(overlay):
     width, height = wx.DisplaySize()
     spacing = width // 32
     stroke = 2
-    color = lambda xy, phase = 0: white if (xy / spacing) % 3 == phase else gray
-    horizontals = ((0, round(y - stroke / 2), width, stroke, *color(y)) for y in range(spacing, height, spacing))
-    verticals = ((round(x - stroke / 2), 0, stroke, height, *color(x, 1)) for x in range(spacing, width, spacing))
+    color = lambda xy, phase=0: white if (xy / spacing) % 3 == phase else gray
+    horizontals = (
+        (0, round(y - stroke / 2), width, stroke, *color(y))
+        for y in range(spacing, height, spacing)
+    )
+    verticals = (
+        (round(x - stroke / 2), 0, stroke, height, *color(x, 1))
+        for x in range(spacing, width, spacing)
+    )
     draw_rectangles(wx.PaintDC(overlay), chain(horizontals, verticals))
 
 

@@ -123,7 +123,6 @@ class ActivityEdge(Base):
     @staticmethod
     def activity_totals(session, start, step, limit):
         end = start + step * limit
-        log.info(f"{start} {step} {limit}")
         edges = get_edges_including_bounds(session, start, end)
         activities = get_overlapping_intervals(edges, start, end)
         front = deque()
@@ -251,7 +250,7 @@ class ActivityUpdater:
                     self.boxed_edges.append(ActivityEdgeOrderedByTime(activity_edge))
                     self.session.add(activity_edge)
                 else:
-                    if d > 0:
+                    if d >= 0:
                         total += d
                         bound_deleted[x] = True
                     self.session.delete(pause_edge)
