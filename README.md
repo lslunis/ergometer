@@ -14,6 +14,8 @@ Right-click on the archive you just built and `Open in Finder`, then right-click
 
 Create or modify `~/Library/Containers/net.lunis.Ergometer/Data/targets.json` to specify usage targets in seconds, e.g. `{"day": 7200, "session": 900, "rest": 300}` will target two hours per day and fifteen minutes per session with a five-minute rest between sessions.
 
+Ergometer must be restarted for the changes to take effect.
+
 ## Use
 
 Launch Ergometer, right-click on its icon in the Dock, and choose `Open at Login`.
