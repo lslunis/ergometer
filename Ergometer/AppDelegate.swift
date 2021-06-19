@@ -14,12 +14,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
+let pedals = ["BT200 v2.3.1 B929", "GWS IDI Device"]
+
 let listen: IOHIDValueCallback = {
     (context, _, sender, _) in
     let app = Unmanaged<App>.fromOpaque(context!).takeUnretainedValue()
     let device = Unmanaged<IOHIDDevice>.fromOpaque(sender!).takeUnretainedValue()
     let product = IOHIDDeviceGetProperty(device, kIOHIDProductKey as CFString) as! CFString as String
-    if product.trimmingCharacters(in: .whitespacesAndNewlines) != "GWS IDI Device" {
+    if !pedals.contains(product.trimmingCharacters(in: .whitespacesAndNewlines))  {
         app.act()
     }
 }
