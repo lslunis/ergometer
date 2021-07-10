@@ -52,7 +52,7 @@ class App {
         window.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.maximumWindow)))
         window.makeKey()
         warningOverlay = Overlay(window, alpha: 0.1, duration: 1, delay: 10)
-        limitOverlay = Overlay(window, alpha: 0.96, duration: 5, delay: 10)
+        limitOverlay = Overlay(window, alpha: 0.96, duration: 5, delay: 15)
         IOHIDManagerOpen(manager, IOOptionBits(kIOHIDOptionsTypeNone))
         IOHIDManagerSetDeviceMatching(manager, [kIOHIDDeviceUsagePageKey: kHIDPage_GenericDesktop] as CFDictionary)
         IOHIDManagerRegisterInputValueCallback(manager, listen, Unmanaged.passUnretained(self).toOpaque())
