@@ -25,5 +25,3 @@ Ergometer creates a system menu bar item that shows the remaining daily, session
 ## Notes
 
 `~/Library/Containers/net.lunis.Ergometer/Data/metrics.json` will contain the number of seconds of usage per day (each day begins at 4 AM local time).
-
-The code ignores events from `GWS IDI Device` since those are a particular brand of foot pedals that I happen to own.
