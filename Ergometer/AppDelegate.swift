@@ -104,7 +104,7 @@ class App {
                 lastFlushed = now
             }
             try display([dayRemaining, sessionRemaining, restRemaining].map {
-                String(format: "%.1f", max(0, $0 / 6.0).rounded(.up) / 10.0)
+                String(format: "%.1f", ($0 / 6.0).rounded(.up) / 10.0)
             }.joined(separator: "  "))
         } catch {
             fail("\(error)")
