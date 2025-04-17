@@ -1,0 +1,98 @@
+#!/usr/bin/env python3
+import argparse
+from functools import reduce
+import json
+
+from datetime import date
+from pathlib import Path
+from subprocess import check_output
+from time import time
+from typing import TypedDict
+
+data_dir = Path.home() / "ergometer" / "data"
+
+
+def load_json(path: Path):
+    with path.open() as file:
+        return json.load(file)
+
+
+class Targets(TypedDict):
+    day: float
+    session: float
+    rest: float
+    lastUpdated: float
+
+
+def load_totals(path: Path):
+    return load_json(path)["totals"]
+
+
+def merge_totals(acc: dict[str, float], next: dict[str, float]):
+    return {k: acc.get(k, 0) + next.get(k, 0) for k in set(acc) | set(next)}
+
+
+def print_history():
+    paths = data_dir.glob("metrics.*.json")
+    totals = reduce(merge_totals, map(load_totals, paths), {})
+    first_day_ordinal = date.fromisoformat(next(iter(totals))).toordinal()
+    today_ordinal = date.today().toordinal()
+    for day_ordinal in range(first_day_ordinal, today_ordinal + 1):
+        day = date.fromordinal(day_ordinal).isoformat()
+        print(f"{day}\t{totals.get(day, 0) / 86400}")
+
+
+def merge_targets(acc: Targets, next: Targets):
+    return max(acc, next, key=lambda t: t["lastUpdated"])
+
+
+def maybe_update_targets(args: argparse.Namespace):
+    paths = data_dir.glob("targets.*.json")
+    default = Targets(day=6 * 3600, session=3600, rest=300, lastUpdated=0)
+    old_targets = reduce(merge_targets, map(load_json, paths), default)
+
+    # TODO: Remove once ramp is done.
+    origin = date(2025, 1, 10)
+    ramp = (date.today() - origin).days * 6 // 7
+
+    new_targets = old_targets.copy()
+    if args.day:
+        new_targets["day"] = round(args.day * 3600)
+    else:
+        new_targets["day"] = min(max(15 * 60, 180 * ramp), default["day"])
+
+    if args.session:
+        new_targets["session"] = round(args.session * 60)
+    else:
+        new_targets["session"] = min(max(5 * 60, 30 * ramp), default["session"])
+
+    print(f"day: {new_targets['day'] / 3600:.2f}h")
+    print(f"session: {new_targets['session'] / 60:.1f}m")
+
+    if new_targets == old_targets:
+        return
+
+    new_targets["lastUpdated"] = time()
+
+    computer_name = check_output(["scutil", "--get", "LocalHostName"]).decode().strip()
+    targets_path = data_dir / f"targets.{computer_name}.json"
+
+    with open(targets_path, "w") as file:
+        json.dump(new_targets, file)
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("day", type=float, nargs="?")
+    parser.add_argument("session", type=float, nargs="?")
+    parser.add_argument("--history", action="store_true")
+    args = parser.parse_args()
+
+    if args.history:
+        print_history()
+    else:
+        maybe_update_targets(args)
+
+
+if __name__ == "__main__":
+    main()
