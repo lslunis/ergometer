@@ -29,7 +29,7 @@ def load_totals(path: Path):
 
 
 def merge_totals(acc: dict[str, float], next: dict[str, float]):
-    return {k: acc.get(k, 0) + next.get(k, 0) for k in set(acc) | set(next)}
+    return {k: acc.get(k, 0) + next.get(k, 0) for k in sorted(set(acc) | set(next))}
 
 
 def print_history():
