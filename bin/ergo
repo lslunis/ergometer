@@ -51,14 +51,14 @@ def maybe_update_targets(args: argparse.Namespace):
     default = Targets(day=6 * 3600, session=3600, rest=300, lastUpdated=0)
     old_targets = reduce(merge_targets, map(load_json, paths), default)
 
-    origin = date(2025, 8, 15)
+    origin = date(2025, 8, 1)
     ramp = (date.today() - origin).days * 6 // 7
 
     new_targets = old_targets.copy()
     if args.day:
         new_targets["day"] = round(args.day * 3600)
     else:
-        new_targets["day"] = min(max(15, 15 * ramp) * 60, default["day"])
+        new_targets["day"] = min(max(36, 6 * ramp) * 60, default["day"])
 
     if args.session:
         new_targets["session"] = round(args.session * 60)
